@@ -30,9 +30,24 @@ describe("MinerU <-> Zotero text alignment", () => {
       const text = spans.map((p) => sdtBlocks.get(p.blockId)!.text.slice(p.start, p.end)).join(" ");
       const a = letters(s.text);
       const b = letters(text);
-      if (Math.abs(a.length - b.length) <= Math.max(6, a.length * 0.1)) good++;
+      // The span may also hold formula glyphs MinerU has as LaTeX; its words must all be there, in order.
+      let k = 0;
+      for (const c of b) if (c === a[k]) k++;
+      if (k >= a.length * 0.95 && b.length <= a.length * 1.6 + 20) good++;
     }
     expect(good / units.length).toBeGreaterThan(0.9);
+  });
+  it("lets a highlight reach across formulas at a sentence's edge", () => {
+    // MinerU sentences opening or closing with inline math, matched to one Zotero sentence.
+    const edge = units.filter((s) => /^\s*\$|\$[\s.,;:)]*$/.test(s.text) && al.toSdt.get(s.id)?.length === 1);
+    const whole = edge.filter((s) => {
+      const [p] = al.toSdt.get(s.id)!;
+      const sent = sdtBlocks.get(p.blockId)!.sentences.find((x) => x.id === p.unitId)!;
+      return p.start === sent.start && p.end === sent.end;
+    });
+    console.log(`formula-edged sentences reaching both ends: ${whole.length}/${edge.length}`);
+    expect(edge.length).toBeGreaterThan(5);
+    expect(whole.length / edge.length).toBeGreaterThan(0.8);
   });
   it("maps Zotero sentences (where PDF highlights live) back to MinerU ones", () => {
     const sdtUnits = base.blocks.filter((b) => b.translatable).flatMap((b) => b.sentences);

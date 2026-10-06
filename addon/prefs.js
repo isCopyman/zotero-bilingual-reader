@@ -1,6 +1,8 @@
 /* eslint-disable no-undef */
 // Reader UI state (JSON of ReaderPrefs); edited from the reader toolbar.
 pref("__prefsPrefix__.readerPrefs", "");
+// How the bilingual page opens: "overlay" = a view inside the PDF's tab, "tab" = a tab of its own
+pref("__prefsPrefix__.openMode", "overlay");
 // OpenAI-compatible API
 pref("__prefsPrefix__.apiBase", "https://api.openai.com/v1");
 pref("__prefsPrefix__.apiKey", "");

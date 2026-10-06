@@ -207,6 +207,8 @@ export interface ZbrHost {
   openUrl?(url: string): void;
   /** Move this page from its tab to a window of its own (only where that applies). */
   popOut?(): Promise<void>;
+  /** Shown as a view inside the PDF's own tab: switch back to the PDF there. */
+  backToPdf?(): void;
 }
 
 declare global {

@@ -41,6 +41,7 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = ""):
 const svg = (body: string) =>
   `<svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 export const ICONS = {
+  pdf: svg('<path d="M5 2.5h7l3.5 3.5v11a.5.5 0 0 1-.5.5H5a.5.5 0 0 1-.5-.5V3a.5.5 0 0 1 .5-.5z"/><path d="M12 2.5V6h3.5"/><path d="M7 10.5h6M7 13.5h4"/>'),
   sidebar: svg('<rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="M7.5 3.5v13"/>'),
   toc: svg('<path d="M4 5h1M8 5h8M6 10h1M10 10h6M6 15h1M10 15h6"/>'),
   marks: svg('<path d="M6 3.5h8a.5.5 0 0 1 .5.5v12.5L10 13.5l-4.5 3V4a.5.5 0 0 1 .5-.5z"/>'),
@@ -281,7 +282,15 @@ export function installOutline(ctx: OutlineCtx) {
   }
 
   /** PDF highlights of this paper, in reading order, like Zotero's annotation sidebar. */
+  let notesPending = false;
   function renderNotes() {
+    // Not while a comment is being typed: that would replace the field under the cursor.
+    if (notes.contains(document.activeElement) && document.activeElement?.tagName === "TEXTAREA") {
+      notesPending = true;
+      return;
+    }
+    notesPending = false;
+    const selected = notes.querySelector<HTMLElement>(".ol-note.cur")?.dataset.id;
     notes.replaceChildren();
     const order = new Map<string, number>();
     ctx.getDoc().blocks.forEach((b, i) => b.sentences.forEach((s, k) => order.set(s.id, i * 1000 + k)));
@@ -299,21 +308,28 @@ export function installOutline(ctx: OutlineCtx) {
     for (const { h } of shown) {
       // Zotero's annotation card: type icon and page, the quoted text, the comment.
       const item = el("div", "ol-note");
+      item.dataset.id = h.id;
       item.style.setProperty("--mark", h.color);
       const head = el("div", "ol-note-head");
       head.append(icon(h.kind === "underline" ? ICONS.underline(h.color) : ICONS.highlight(h.color)), el("span", "", h.page ? `页 ${h.page}` : ""));
+      const more = el("button", "ol-note-more", "…");
+      more.title = "颜色、在 PDF 中查看、删除";
+      more.addEventListener("click", (e) => {
+        e.stopPropagation();
+        ctx.openHighlight(h.id);
+      });
+      head.append(more);
       item.append(head, el("div", "ol-note-text", h.text || "（无文字）"));
-      if (h.comment) item.append(el("div", "ol-note-comment", h.comment));
-      item.title = "点击跳到这句；再点一次打开批注卡片";
-      item.addEventListener("click", () => {
+      item.append(commentField(h, item));
+      if (h.id === selected) item.classList.add("cur");
+      item.title = "点击跳到这句";
+      item.addEventListener("click", (e) => {
+        if ((e.target as HTMLElement).closest("textarea")) return;
         const id = h.unitIds.find((u) => document.querySelector(`.s[data-u="${CSS.escape(u)}"]`));
         const span = id && document.querySelector<HTMLElement>(`.s[data-u="${CSS.escape(id)}"]`);
-        if (!span) return ctx.toast("在当前显示里找不到这条高亮的句子");
-        const r = span.getBoundingClientRect();
-        const near = r.top > 0 && r.bottom < window.innerHeight;
-        if (near && item.classList.contains("cur")) return ctx.openHighlight(h.id);
         notes.querySelectorAll(".ol-note.cur").forEach((n) => n.classList.remove("cur"));
         item.classList.add("cur");
+        if (!span) return ctx.toast("在当前显示里找不到这条高亮的句子");
         span.scrollIntoView({ block: "center" });
         span.classList.remove("ol-flash");
         void span.offsetWidth;
@@ -321,6 +337,58 @@ export function installOutline(ctx: OutlineCtx) {
       });
       notes.append(item);
     }
+  }
+
+  /**
+   * The comment, edited in place as in Zotero's sidebar: saved a moment after typing stops and
+   * when the field is left, without a save button. Shown on cards with a comment and on the
+   * selected card.
+   */
+  function commentField(h: HighlightView, item: HTMLElement): HTMLTextAreaElement {
+    const ta = el("textarea", "ol-note-comment");
+    ta.value = h.comment ?? "";
+    ta.placeholder = "添加批注…";
+    ta.rows = 1;
+    if (!ta.value) item.classList.add("no-comment");
+    const fit = () => {
+      ta.style.height = "auto";
+      ta.style.height = `${ta.scrollHeight}px`;
+    };
+    let saved = ta.value;
+    let timer: number | undefined;
+    const flush = () => {
+      window.clearTimeout(timer);
+      timer = undefined;
+      const value = ta.value;
+      if (value === saved) return;
+      saved = value;
+      // The page shows it at once; Zotero's copy follows.
+      h.comment = value || undefined;
+      document.querySelectorAll<HTMLElement>(".s.marked").forEach((s) => {
+        if (h.unitIds.includes(s.dataset.u ?? "")) s.title = value;
+      });
+      ctx.host.updateHighlight({ id: h.id, comment: value }).catch((e) => ctx.toast(`保存批注失败：${e?.message ?? e}`));
+    };
+    ta.addEventListener("input", () => {
+      fit();
+      item.classList.toggle("no-comment", !ta.value);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(flush, 600);
+    });
+    ta.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+      if (e.key === "Escape") ta.blur();
+    });
+    ta.addEventListener("focus", () => {
+      notes.querySelectorAll(".ol-note.cur").forEach((n) => n !== item && n.classList.remove("cur"));
+      item.classList.add("cur");
+    });
+    ta.addEventListener("blur", () => {
+      flush();
+      if (notesPending) window.setTimeout(renderNotes);
+    });
+    requestAnimationFrame(fit);
+    return ta;
   }
 
   function save() {

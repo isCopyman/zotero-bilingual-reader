@@ -3,6 +3,15 @@
 </linkset>
 <vbox id="zbr-prefs" class="main-section" onload="Zotero.__addonInstance__?.hooks.onPrefsLoad(window)">
   <groupbox>
+    <label><html:h2>打开方式</html:h2></label>
+    <radiogroup id="zbr-open-mode" preference="__prefsPrefix__.openMode">
+      <radio value="overlay" label="在 PDF 标签页里切换视图：点 PDF 工具栏上的双语图标进入，点双语页左上角的 PDF 图标返回，不多开标签页" />
+      <radio value="tab" label="新标签页：双语页单独占一个标签页，紧挨着 PDF" />
+    </radiogroup>
+    <description class="zbr-hint">两种方式都可以在双语页点“新窗口”移到单独的窗口，和 PDF 左右并排。改动对之后打开的论文生效。</description>
+  </groupbox>
+
+  <groupbox>
     <label><html:h2>翻译</html:h2></label>
     <description class="zbr-hint">阅读时按段落分批翻译，看到哪里译到哪里；每篇论文第一次翻译前，先用一次短请求定下这篇的术语表，之后各段统一使用。想让 Agent 通读全文、统一术语后整篇译完，在双语页点“交给 Agent…”，把任务交给你自己打开的 Agent 会话，过程在那边看得到。</description>
     <html:table class="zbr-grid">

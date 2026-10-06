@@ -3,6 +3,7 @@
 
 import { config } from "../../package.json";
 import { createHost, type ZoteroHost } from "./host";
+import { getPref } from "./prefs";
 
 export const TAB_TYPE = "zbr";
 const READER_URL = `chrome://${config.addonRef}/content/reader/index.html`;
@@ -32,6 +33,11 @@ function tabTitle(attachment: any): string {
   return `双语 · ${title}`;
 }
 
+/** "overlay": a view inside the PDF's own tab, switched with a button; "tab": a tab of its own. */
+export function openMode(): "overlay" | "tab" {
+  return getPref("openMode") === "tab" ? "tab" : "overlay";
+}
+
 export async function openBilingual(item: any) {
   const attachment = await resolveAttachment(item);
   const win = Zotero.getMainWindow() as any;
@@ -39,6 +45,7 @@ export async function openBilingual(item: any) {
     win.alert("没有找到可用的 PDF 附件。");
     return;
   }
+  if (openMode() === "overlay") return showOverlay(attachment);
   const popped = windows.get(attachment.id);
   if (popped && !popped.closed) {
     popped.focus();
@@ -74,12 +81,117 @@ export async function openBilingual(item: any) {
     Tabs.close(id);
     await openBilingualWindow(attachment);
   };
-  const doc = win.document as Document;
-  const iframe = doc.createElementNS("http://www.w3.org/1999/xhtml", "iframe") as HTMLIFrameElement;
-  iframe.setAttribute("src", READER_URL);
+  const iframe = makeReaderFrame(win.document, host);
   iframe.setAttribute("flex", "1");
   iframe.style.cssText = "border:0;width:100%;height:100%;display:block;";
   (container as HTMLElement).style.display = "flex";
+  container.append(iframe);
+}
+
+const windows = new Map<number, Window>();
+
+/** Bilingual views laid over PDF reader tabs, by tab id. */
+const overlays = new Map<string, { iframe: HTMLIFrameElement; host: ZoteroHost; itemID: number }>();
+let tabObserverID: string | null = null;
+
+function setOverlayShown(tabID: string, shown: boolean) {
+  const o = overlays.get(tabID);
+  if (!o) return;
+  // Hidden with visibility, not display: the page keeps its layout and scroll position.
+  o.iframe.style.visibility = shown ? "visible" : "hidden";
+  o.iframe.toggleAttribute("zbr-shown", shown);
+  const win = Zotero.getMainWindow() as any;
+  // The reader underneath keeps its place; keys go to whichever view is on top.
+  if (shown) o.iframe.focus();
+  else (Zotero as any).Reader.getByTabID?.(tabID)?.focus?.();
+  win.document.getElementById(tabID)?.toggleAttribute("zbr-bilingual", shown);
+}
+
+function disposeOverlay(tabID: string) {
+  const o = overlays.get(tabID);
+  if (!o) return;
+  overlays.delete(tabID);
+  o.host.dispose();
+  o.iframe.remove();
+}
+
+/**
+ * The bilingual page as a second view of the PDF's own reader tab: laid over the reader, hidden
+ * again with the page's "返回 PDF" button. No extra tab; both views keep their reading position.
+ */
+export async function showOverlay(attachment: any) {
+  const popped = windows.get(attachment.id);
+  if (popped && !popped.closed) {
+    popped.focus();
+    return;
+  }
+  const win = Zotero.getMainWindow() as any;
+  const Tabs = win.Zotero_Tabs;
+  // A bilingual tab of this PDF opened earlier (the other mode): use that.
+  const tab = Tabs._tabs.find((t: any) => t.type === TAB_TYPE && t.data?.zbrItemID === attachment.id);
+  if (tab) {
+    Tabs.select(tab.id);
+    return;
+  }
+  let tabID = Tabs.getTabIDByItemID(attachment.id);
+  const loaded = tabID && Tabs._getTab(tabID)?.tab?.type === "reader";
+  if (!loaded) {
+    const reader = await (Zotero as any).Reader.open(attachment.id);
+    tabID = reader?.tabID ?? Tabs.getTabIDByItemID(attachment.id);
+  } else Tabs.select(tabID);
+  const container = tabID && (win.document.getElementById(tabID) as HTMLElement | null);
+  if (!container) return;
+  const existing = overlays.get(tabID);
+  if (existing?.iframe.isConnected) return setOverlayShown(tabID, true);
+  if (existing) disposeOverlay(tabID);
+
+  // The reader tab is unloaded after a while unused, which removes its container: drop ours.
+  tabObserverID ??= Zotero.Notifier.registerObserver(
+    {
+      notify(event: string, _type: string, ids: string[]) {
+        if (event === "close") for (const id of ids) disposeOverlay(id);
+      },
+    } as any,
+    ["tab"],
+    "zbr-overlays",
+  );
+
+  const host = createHost(attachment);
+  host.backToPdf = () => setOverlayShown(tabID, false);
+  host.popOut = async () => {
+    disposeOverlay(tabID);
+    await openBilingualWindow(attachment);
+  };
+  // Showing a sentence or highlight in the PDF reveals the reader under the overlay first.
+  const openInPdf = host.openInPdf.bind(host);
+  const openHighlight = host.openHighlight.bind(host);
+  host.openInPdf = (target) => {
+    setOverlayShown(tabID, false);
+    return openInPdf(target);
+  };
+  host.openHighlight = (id) => {
+    setOverlayShown(tabID, false);
+    return openHighlight(id);
+  };
+  const iframe = makeReaderFrame(win.document, host);
+  // Over the whole reader (its toolbar and sidebars too); the item pane on the right stays.
+  iframe.style.cssText = "border:0;position:absolute;inset:0;width:100%;height:100%;z-index:5;background:var(--material-background, #fff);";
+  if (!container.style.position) container.style.position = "relative";
+  container.append(iframe);
+  overlays.set(tabID, { iframe, host, itemID: attachment.id });
+  setOverlayShown(tabID, true);
+}
+
+/** Whether the PDF of this reader tab currently shows the bilingual view. */
+export function overlayShown(tabID: string): boolean {
+  const o = overlays.get(tabID);
+  return !!o && o.iframe.hasAttribute("zbr-shown");
+}
+
+/** The reader page in a chrome iframe, given its host once the page has loaded. */
+function makeReaderFrame(doc: Document, host: ZoteroHost): HTMLIFrameElement {
+  const iframe = doc.createElementNS("http://www.w3.org/1999/xhtml", "iframe") as HTMLIFrameElement;
+  iframe.setAttribute("src", READER_URL);
   // The iframe first fires "load" for its initial about:blank document, so only inject into the
   // reader page; a reload creates a new document, which gets the host again.
   const inject = () => {
@@ -93,10 +205,14 @@ export async function openBilingual(item: any) {
     w.dispatchEvent(new w.Event("zbr-host-ready"));
   };
   iframe.addEventListener("load", inject, true);
-  container.append(iframe);
+  return iframe;
 }
 
-const windows = new Map<number, Window>();
+export function closeOverlays() {
+  for (const id of [...overlays.keys()]) disposeOverlay(id);
+  if (tabObserverID) Zotero.Notifier.unregisterObserver(tabObserverID);
+  tabObserverID = null;
+}
 
 /**
  * The bilingual page in a window of its own, on the right half of the screen: with Zotero's

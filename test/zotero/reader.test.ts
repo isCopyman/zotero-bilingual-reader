@@ -83,6 +83,8 @@ describe("Bilingual Reader in Zotero", function () {
       1,
     );
     Z.Prefs.set("extensions.zotero.zbr.readerPrefs", JSON.stringify({ engineId: "test:idle", fontSize: 17, theme: "auto" }), true);
+    // Most tests drive the page in a tab of its own; the overlay view has its own test.
+    Z.Prefs.set("extensions.zotero.zbr.openMode", "tab", true);
     attachment = await Z.Attachments.importFromFile({ file: pdf, libraryID: Z.Libraries.userLibraryID });
     const key = attachment.key;
 
@@ -362,6 +364,8 @@ describe("Bilingual Reader in Zotero", function () {
 
   it("keeps the tab list intact for other plugins and leaves the bilingual tab out of the saved session", async function () {
     const win = Zotero.getMainWindow() as any;
+    // In a tab of its own there is no PDF underneath to go back to.
+    assert.equal(rwin.getComputedStyle(rdoc.getElementById("btn-back-pdf")!).display, "none");
     const Tabs = win.Zotero_Tabs;
     const state = Tabs.getState();
     // Tab plugins pair getState() with _tabs by index: same length, same order.
@@ -630,12 +634,35 @@ describe("Bilingual Reader in Zotero", function () {
     lastStep = "outline 22";
     panel.querySelectorAll<HTMLElement>(".ol-tabs button")[2].click();
     lastStep = "outline 23";
-    const note = await waitFor(() => [...panel.querySelectorAll<HTMLElement>(".ol-notes .ol-note")].find((n) => /回头看这里/.test(n.textContent!)), 5000, 20);
+    const commentOf = (n: Element) => n.querySelector<HTMLTextAreaElement>("textarea.ol-note-comment")?.value ?? "";
+    const note = await waitFor(() => [...panel.querySelectorAll<HTMLElement>(".ol-notes .ol-note")].find((n) => /回头看这里/.test(commentOf(n))), 5000, 20);
     note.click();
     lastStep = "outline 24";
     await waitFor(() => { const s = rdoc.querySelector<HTMLElement>(`.s[data-u="${unit}"]`)!.getBoundingClientRect(); return s.top > 0 && s.bottom < rwin.innerHeight; }, 3000, 20);
     lastStep = "outline 25";
     await snap("18c-annotations");
+    // The comment is edited in place and saved by itself shortly after typing stops; the card
+    // keeps focus while Zotero's copy is updated (test/out/comment-edit.json: times).
+    lastStep = "outline 25b";
+    const ta = note.querySelector<HTMLTextAreaElement>("textarea.ol-note-comment")!;
+    ta.focus();
+    const typeTimes: number[] = [];
+    for (const ch of "，第二遍") {
+      const t = rwin.performance.now();
+      ta.value += ch;
+      ta.dispatchEvent(new rwin.Event("input", { bubbles: true }));
+      typeTimes.push(Math.round((rwin.performance.now() - t) * 10) / 10);
+      await sleep(80);
+    }
+    const t0 = Date.now();
+    const saved = await waitFor(() => attachment.getAnnotations().find((a: any) => a.annotationComment === "回头看这里，第二遍"), 5000, 20);
+    const saveMs = Date.now() - t0;
+    await sleep(800);
+    assert.equal(rdoc.activeElement, ta, "still typing in the same field after the save");
+    await IOUtils.writeJSON(PathUtils.join(outDir(), "comment-edit.json"), { typeTimes, saveMsAfterLastKey: saveMs });
+    ta.blur();
+    saved.annotationComment = "回头看这里";
+    await saved.saveTx();
     // Clean up: highlight, bookmark, panel.
     lastStep = "outline 26";
     for (const a of attachment.getAnnotations()) if (a.annotationComment === "回头看这里") await a.eraseTx();
@@ -647,6 +674,52 @@ describe("Bilingual Reader in Zotero", function () {
     key("t");
     lastStep = "outline 30";
     await waitFor(() => panel.hidden && !rdoc.body.classList.contains("outline-open"), 3000, 20);
+  });
+
+  it("opens as a view inside the PDF's own tab, switched with buttons", async function () {
+    const win = Zotero.getMainWindow() as any;
+    const Tabs = win.Zotero_Tabs;
+    const tabsBefore = Tabs._tabs.length;
+    const zbrTab = Tabs._tabs.find((t: any) => t.type === "zbr");
+    if (zbrTab) Tabs.close(zbrTab.id);
+    Z.Prefs.set("extensions.zotero.zbr.openMode", "overlay", true);
+    try {
+      await Z.ZBR.api.openBilingual(attachment);
+      const tabID = Tabs.getTabIDByItemID(attachment.id);
+      assert.ok(tabID, "the PDF reader tab is open");
+      assert.equal(Tabs.selectedID, tabID);
+      assert.isFalse(Tabs._tabs.some((t: any) => t.type === "zbr"), "no extra tab");
+      const container = win.document.getElementById(tabID);
+      const iframe = await waitFor(() => container.querySelector("iframe[zbr-shown]") as HTMLIFrameElement, 30_000);
+      const owin = iframe.contentWindow as any;
+      const odoc = await waitFor(() => (owin.document.body?.classList.contains("ready") ? owin.document : null), 120_000);
+      const back = odoc.getElementById("btn-back-pdf") as HTMLElement;
+      assert.isFalse(back.hidden, "back-to-PDF button shown");
+      await snap("19-overlay");
+      // Back to the PDF: the view stays loaded, only hidden.
+      back.click();
+      assert.isFalse(iframe.hasAttribute("zbr-shown"));
+      assert.equal(iframe.style.visibility, "hidden");
+      await snap("19b-overlay-pdf");
+      // The bilingual icon in the reader's toolbar brings it back, the same page.
+      const reader = Z.Reader.getByTabID(tabID);
+      const btn = await waitFor(() => reader._iframeWindow?.document.querySelector("[data-zbr]") as HTMLElement, 30_000);
+      btn.click();
+      await waitFor(() => iframe.hasAttribute("zbr-shown"), 5000, 20);
+      assert.equal(iframe.contentWindow, owin, "same page, not reloaded");
+      // Closing the PDF tab disposes of the view.
+      Tabs.close(tabID);
+      await waitFor(() => !iframe.isConnected, 5000, 20);
+      assert.equal(Tabs._tabs.length, tabsBefore - (zbrTab ? 1 : 0));
+    } finally {
+      Z.Prefs.set("extensions.zotero.zbr.openMode", "tab", true);
+      // Later tests use the bilingual tab again.
+      await Z.ZBR.api.openBilingual(attachment);
+      const tab = Tabs._tabs.find((t: any) => t.type === "zbr");
+      const iframe = await waitFor(() => win.document.getElementById(tab.id)?.querySelector("iframe") as HTMLIFrameElement);
+      rwin = iframe.contentWindow;
+      rdoc = await waitFor(() => (rwin.document.body?.classList.contains("ready") ? rwin.document : null), 120_000);
+    }
   });
 
   it("offers a MinerU cloud parse only where there is no MinerU result, with sign-up steps", async function () {

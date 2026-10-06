@@ -8,6 +8,7 @@ declare namespace _ZoteroTypes {
   interface Prefs {
     PluginPrefsMap: {
       "readerPrefs": string;
+      "openMode": string;
       "apiBase": string;
       "apiKey": string;
       "apiModel": string;

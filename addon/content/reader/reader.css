@@ -224,9 +224,16 @@ body.outline-open #doc.mode-side { margin-left: max(288px, calc((100% - 1400px) 
 .ol-note.cur { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .ol-note-head { display: flex; gap: 6px; align-items: center; padding: 5px 8px; font-weight: 600; font-size: 12px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--fg) 3%, transparent); }
 .ol-note-text { margin: 6px 8px; padding-left: 8px; border-left: 2px solid var(--mark, #ffd400); color: var(--muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
-.ol-note-comment { margin: 0 8px 7px; white-space: pre-wrap; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
+.ol-note-head > span { flex: 1; }
+.ol-note-more { border: 0; background: none; color: var(--muted); padding: 0 4px; font-weight: 700; cursor: pointer; line-height: 1; }
+.ol-note-more:hover { color: var(--fg); }
+.ol-note-comment { display: block; box-sizing: border-box; width: calc(100% - 16px); margin: 0 8px 7px; padding: 3px 4px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--fg); font: inherit; resize: none; overflow: hidden; min-height: 1.6em; }
+.ol-note-comment:focus { outline: none; border-color: var(--line); background: var(--bg); cursor: text; }
+.ol-note.no-comment:not(.cur) .ol-note-comment { display: none; }
+.ol-note .ol-note-comment::placeholder { color: var(--muted); }
 #toolbar button.icon { display: inline-grid; place-items: center; width: 30px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
 #toolbar button.icon:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); color: var(--fg); }
+#toolbar button.icon[hidden] { display: none; }
 body.outline-open #toolbar button#btn-outline { background: color-mix(in srgb, var(--fg) 12%, transparent); color: var(--fg); }
 section.blk { position: relative; }
 section.blk.bookmarked::before { content: ""; position: absolute; left: -18px; top: 4px; width: 8px; height: 14px; background: var(--accent); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%); }

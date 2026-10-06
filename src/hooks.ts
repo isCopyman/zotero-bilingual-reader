@@ -1,7 +1,7 @@
 import { config } from "../package.json";
 import { isPrefetching, prefetch, stopPrefetch } from "./zotero/prefetch";
 import { onPrefsLoad } from "./zotero/prefs-pane";
-import { canOpen, openBilingual, patchTabs, unpatchTabs } from "./zotero/tab";
+import { canOpen, closeOverlays, openBilingual, patchTabs, unpatchTabs } from "./zotero/tab";
 
 const pluginID = config.addonID;
 const Z = Zotero as any;
@@ -103,10 +103,12 @@ async function onMainWindowLoad(win: any) {
 }
 
 async function onMainWindowUnload(win: any) {
+  closeOverlays();
   unpatchTabs(win);
 }
 
 async function onShutdown() {
+  closeOverlays();
   for (const win of Zotero.getMainWindows()) unpatchTabs(win);
   if (menuID) Z.MenuManager.unregisterMenu(menuID);
   Z.Reader.unregisterEventListener("renderToolbar", onRenderToolbar);

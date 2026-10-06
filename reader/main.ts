@@ -325,6 +325,7 @@ function html(markup: string): DocumentFragment {
 function buildToolbar() {
   const bar = $("#toolbar");
   bar.replaceChildren(html(`
+    <button id="btn-back-pdf" class="icon" title="返回 PDF（双语视图保留，再点 PDF 工具栏上的双语图标回来）" hidden>${ICONS.pdf}</button>
     <button id="btn-outline" class="icon" title="侧栏：目录、书签和注释（快捷键 T）">${ICONS.sidebar}</button>
     <div class="title" id="title"></div>
     <div class="seg" title="显示模式">
@@ -400,6 +401,8 @@ function buildToolbar() {
   });
   $("#btn-handoff").addEventListener("click", () => void openHandoff());
   $("#btn-popout").hidden = !state.host.popOut;
+  $("#btn-back-pdf").hidden = !state.host.backToPdf;
+  $("#btn-back-pdf").addEventListener("click", () => state.host.backToPdf?.());
   $("#btn-outline").addEventListener("click", () => outline?.toggle());
   $("#btn-popout").addEventListener("click", () => void state.host.popOut?.());
   $("#btn-glossary").addEventListener("click", () => void openGlossary());

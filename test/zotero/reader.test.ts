@@ -348,6 +348,20 @@ describe("Bilingual Reader in Zotero", function () {
     engine.selectedOptions[0].textContent = label;
   });
 
+  it("keeps the tab list intact for other plugins and leaves the bilingual tab out of the saved session", async function () {
+    const win = Zotero.getMainWindow() as any;
+    const Tabs = win.Zotero_Tabs;
+    const state = Tabs.getState();
+    // Tab plugins pair getState() with _tabs by index: same length, same order.
+    assert.equal(state.length, Tabs._tabs.length);
+    const i = Tabs._tabs.findIndex((t: any) => t.type === "zbr");
+    assert.isAtLeast(i, 0);
+    assert.equal(state[i].type, "zbr");
+    assert.deepInclude(Tabs._tabs[i].data.companionOf, { itemID: attachment.id });
+    // The session (what Zotero restores on start) has no bilingual tab.
+    assert.isFalse(win.ZoteroPane.getState().tabs.some((t: any) => t.type === "zbr"));
+  });
+
   it("switches display modes", async function () {
     for (const mode of ["side", "zh", "en"]) {
       (rdoc.querySelector(`[data-mode="${mode}"]`) as HTMLElement).click();
@@ -547,6 +561,80 @@ describe("Bilingual Reader in Zotero", function () {
     assert.isBelow(perf["hover-handler-avg-ms"], 4, JSON.stringify(perf));
     assert.isBelow(perf["render-side-ms"], 300, JSON.stringify(perf));
     assert.isBelow(perf["scroll-layout-worst-step-ms"], 50, JSON.stringify(perf));
+  });
+
+  it("side panel: outline with the current section, bookmarks, and the paper's annotations", async function () {
+    lastStep = "outline 1";
+    const host = rwin.wrappedJSObject.zbrHost;
+    const key = (k: string) => rdoc.body.dispatchEvent(new rwin.KeyboardEvent("keydown", { key: k, bubbles: true }));
+    rdoc.scrollingElement!.scrollTop = 0;
+    lastStep = "outline 2";
+    key("t");
+    lastStep = "outline 3";
+    const panel = await waitFor(() => { const p = rdoc.getElementById("outline"); return p && !p.hidden && p; }, 3000, 20);
+    lastStep = "outline 4";
+    assert.isTrue(rdoc.body.classList.contains("outline-open"));
+    lastStep = "outline 5";
+    const items = [...panel.querySelectorAll<HTMLElement>(".ol-toc .ol-item")];
+    lastStep = "outline 6";
+    assert.isAbove(items.length, 10, "headings listed");
+    // Jump to a later heading; it becomes the current one.
+    lastStep = "outline 7";
+    const target = items[Math.floor(items.length / 2)];
+    lastStep = "outline 8";
+    target.querySelector<HTMLElement>(".ol-text")!.click();
+    lastStep = "outline 9";
+    const tid = target.dataset.b!;
+    await waitFor(() => rdoc.querySelector(`#outline .ol-item.cur[data-b="${tid}"]`), 3000, 20).catch((e) => {
+      lastStep += ` cur=${rdoc.querySelector("#outline .ol-item.cur")?.getAttribute("data-b")} want=${tid} top=${rdoc.querySelector(`section.blk[data-b="${tid}"]`)?.getBoundingClientRect().top} scroll=${rdoc.scrollingElement!.scrollTop}`;
+      throw e;
+    });
+    lastStep = "outline 10";
+    const sec = rdoc.querySelector<HTMLElement>(`section.blk[data-b="${target.dataset.b}"]`)!;
+    lastStep = "outline 11";
+    assert.isTrue(sec.getBoundingClientRect().top < 200, "scrolled to the heading");
+    lastStep = "outline 12";
+    await snap("18-outline");
+    // Bookmark the place with B; it is kept with the paper.
+    lastStep = "outline 13";
+    const marksBefore = (await host.getBookmarks()).length;
+    lastStep = "outline 14";
+    key("b");
+    lastStep = "outline 15";
+    await waitFor(async () => (await host.getBookmarks()).length === marksBefore + 1, 3000, 50);
+    lastStep = "outline 16";
+    panel.querySelectorAll<HTMLElement>(".ol-tabs button")[1].click();
+    lastStep = "outline 17";
+    await waitFor(() => panel.querySelectorAll(".ol-marks .ol-mark").length === marksBefore + 1, 3000, 20);
+    lastStep = "outline 18";
+    assert.isNotNull(rdoc.querySelector("section.blk.bookmarked"));
+    lastStep = "outline 19";
+    await snap("18b-bookmarks");
+    // Annotations: a highlight made here is listed, with its comment.
+    lastStep = "outline 20";
+    const unit = [...rdoc.querySelectorAll<HTMLElement>("section.k-paragraph .en .s[data-u]")][30].dataset.u!;
+    lastStep = "outline 21";
+    await host.createHighlight({ unitIds: [unit], color: "#5fb236", comment: "回头看这里" });
+    lastStep = "outline 22";
+    panel.querySelectorAll<HTMLElement>(".ol-tabs button")[2].click();
+    lastStep = "outline 23";
+    const note = await waitFor(() => [...panel.querySelectorAll<HTMLElement>(".ol-notes .ol-note")].find((n) => /回头看这里/.test(n.textContent!)), 5000, 20);
+    note.click();
+    lastStep = "outline 24";
+    await waitFor(() => { const s = rdoc.querySelector<HTMLElement>(`.s[data-u="${unit}"]`)!.getBoundingClientRect(); return s.top > 0 && s.bottom < rwin.innerHeight; }, 3000, 20);
+    lastStep = "outline 25";
+    await snap("18c-annotations");
+    // Clean up: highlight, bookmark, panel.
+    lastStep = "outline 26";
+    for (const a of attachment.getAnnotations()) if (a.annotationComment === "回头看这里") await a.eraseTx();
+    lastStep = "outline 27";
+    await host.setBookmarks((await host.getBookmarks()).slice(0, marksBefore));
+    lastStep = "outline 28";
+    panel.querySelectorAll<HTMLElement>(".ol-tabs button")[0].click();
+    lastStep = "outline 29";
+    key("t");
+    lastStep = "outline 30";
+    await waitFor(() => panel.hidden && !rdoc.body.classList.contains("outline-open"), 3000, 20);
   });
 
   it("offers a MinerU cloud parse only where there is no MinerU result, with sign-up steps", async function () {

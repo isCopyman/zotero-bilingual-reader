@@ -6,6 +6,7 @@
 // engine configuration, prompt version and glossary it was made with, and the reader's
 // "retranslate" action replaces it with the current engine's output.
 
+import type { Bookmark } from "../../core/host-api";
 import { PROMPT_VERSION } from "../../core/translate/protocol";
 import { clearTimeout, setTimeout } from "./globals";
 
@@ -26,6 +27,8 @@ interface CacheFile {
   units: Record<string, CachedUnit>;
   /** Block the reader was last looking at. */
   position?: string;
+  /** The reader's bookmarks in this paper. */
+  bookmarks?: Bookmark[];
   /** Key terms of this paper (English = 中文 lines), made once before batch translation. */
   glossary?: string;
 }
@@ -172,6 +175,15 @@ export class TranslationStore {
   set glossary(text: string | undefined) {
     if (this.data.glossary === text) return;
     this.data.glossary = text;
+    this.scheduleWrite();
+  }
+
+  get bookmarks(): Bookmark[] {
+    return this.data.bookmarks ?? [];
+  }
+
+  set bookmarks(list: Bookmark[]) {
+    this.data.bookmarks = list;
     this.scheduleWrite();
   }
 

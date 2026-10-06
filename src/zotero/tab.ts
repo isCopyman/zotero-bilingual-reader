@@ -58,7 +58,9 @@ export async function openBilingual(item: any) {
     index: after < 0 ? undefined : after + 1,
     title: tabTitle(attachment),
     // Not `itemID`: Zotero_Tabs.getTabIDByItemID would then treat this tab as the PDF reader tab.
-    data: { zbrItemID: attachment.id },
+    // `companionOf` tells other plugins (tab groups and the like) which PDF this page belongs
+    // to, so they can keep it next to that PDF; nothing here depends on anyone reading it.
+    data: { zbrItemID: attachment.id, companionOf: { itemID: attachment.id, parentItemID: attachment.parentItemID ?? null } },
     select: true,
     onClose: () => {
       hosts.get(id)?.dispose();
@@ -140,26 +142,33 @@ export async function openBilingualWindow(attachment: any) {
  * Bilingual tabs are not written into the saved session: Zotero's restoreState expects a hook
  * for every tab type, and a saved tab of an unknown type would break restoring all tabs if the
  * plugin were disabled. Reopening is one click.
+ *
+ * Filtered where the session is built (ZoteroPane.getState), not in Zotero_Tabs.getState: other
+ * plugins read Zotero_Tabs.getState next to Zotero_Tabs._tabs and pair them by index, so that
+ * list must keep every tab.
  */
 export function patchTabs(win: any) {
-  const Tabs = win.Zotero_Tabs;
-  if (!Tabs || Tabs.__zbrOrigGetState) return;
-  const orig = Tabs.getState;
+  const pane = win.ZoteroPane;
+  if (!pane?.getState || pane.__zbrOrigGetState) return;
+  const orig = pane.getState;
   const wrapper = function (this: any, ...args: any[]) {
-    return orig.apply(this, args).filter((t: any) => t.type !== TAB_TYPE);
+    const state = orig.apply(this, args);
+    if (Array.isArray(state?.tabs)) state.tabs = state.tabs.filter((t: any) => t.type !== TAB_TYPE);
+    return state;
   };
-  Tabs.__zbrOrigGetState = orig;
-  Tabs.__zbrGetState = wrapper;
-  Tabs.getState = wrapper;
+  pane.__zbrOrigGetState = orig;
+  pane.__zbrGetState = wrapper;
+  pane.getState = wrapper;
 }
 
 export function unpatchTabs(win: any) {
   const Tabs = win.Zotero_Tabs;
-  if (!Tabs?.__zbrOrigGetState) return;
-  const ids = Tabs._tabs.filter((t: any) => t.type === TAB_TYPE).map((t: any) => t.id);
+  const ids = Tabs?._tabs.filter((t: any) => t.type === TAB_TYPE).map((t: any) => t.id) ?? [];
   if (ids.length) Tabs.close(ids);
+  const pane = win.ZoteroPane;
+  if (!pane?.__zbrOrigGetState) return;
   // Restore only if nobody wrapped getState after us; otherwise leave their wrapper intact.
-  if (Tabs.getState === Tabs.__zbrGetState) Tabs.getState = Tabs.__zbrOrigGetState;
-  delete Tabs.__zbrOrigGetState;
-  delete Tabs.__zbrGetState;
+  if (pane.getState === pane.__zbrGetState) pane.getState = pane.__zbrOrigGetState;
+  delete pane.__zbrOrigGetState;
+  delete pane.__zbrGetState;
 }

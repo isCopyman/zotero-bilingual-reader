@@ -3,6 +3,7 @@ import type { Enrichment } from "../core/mineru";
 import type { Block, ZbrDocument } from "../core/model";
 import { installBlockAction } from "./block-action";
 import { observeFigures } from "./figures";
+import { installOutline, type OutlineTab } from "./outline";
 import { openMineruDialog } from "./mineru-dialog";
 import { installSearch } from "./search";
 import { handoffStatus, initHandoff, modal, openGlossary, openHandoff } from "./handoff";
@@ -82,6 +83,7 @@ function firstVisibleBlock(): string | null {
 }
 
 let finder: ReturnType<typeof installSearch> | undefined;
+let outline: ReturnType<typeof installOutline> | undefined;
 
 function renderAll() {
   const t0 = performance.now();
@@ -109,6 +111,7 @@ function renderAll() {
   main.replaceChildren(frag);
   indexSpans(main);
   finder?.refresh();
+  outline?.refresh();
   figObserver?.disconnect();
   figObserver = observeFigures({ host: state.host, root: main, blocks: state.blocks, enrich: state.enrich, getRich: () => (isMineruDoc() ? "mineru" : state.prefs.rich), toast });
   setupAutoTranslate();
@@ -129,6 +132,7 @@ function applyHighlights() {
     el.removeAttribute("title");
   }
   marked = [];
+  outline?.refreshNotes();
   for (const h of state.highlights) {
     for (const id of h.unitIds) {
       spansOf(id).forEach((el) => {
@@ -166,6 +170,8 @@ function applyTranslations(units: Translations) {
     const block = state.blocks.get(bid)!;
     document.querySelector(`section.blk[data-b="${CSS.escape(bid)}"]`)?.classList.toggle("done", isBlockTranslated(block, state.tr));
   }
+  // The outline shows headings with their translations.
+  if ([...touched].some((bid) => state.blocks.get(bid)?.kind === "heading")) outline?.refreshToc();
   updateProgressText();
 }
 
@@ -319,6 +325,7 @@ function html(markup: string): DocumentFragment {
 function buildToolbar() {
   const bar = $("#toolbar");
   bar.replaceChildren(html(`
+    <button id="btn-outline" class="link" title="目录、书签和注释（快捷键 T）">目录</button>
     <div class="title" id="title"></div>
     <div class="seg" title="显示模式">
       <button data-mode="en" title="快捷键 1">英文</button><button data-mode="interleave" title="快捷键 2">对照</button><button data-mode="side" title="快捷键 3">左右</button><button data-mode="zh" title="快捷键 4">中文</button>
@@ -393,6 +400,7 @@ function buildToolbar() {
   });
   $("#btn-handoff").addEventListener("click", () => void openHandoff());
   $("#btn-popout").hidden = !state.host.popOut;
+  $("#btn-outline").addEventListener("click", () => outline?.toggle());
   $("#btn-popout").addEventListener("click", () => void state.host.popOut?.());
   $("#btn-glossary").addEventListener("click", () => void openGlossary());
   $("#btn-clear").addEventListener("click", () => void confirmClear());
@@ -491,6 +499,8 @@ function installShortcuts() {
     if (mode) setPrefs({ mode });
     else if (e.key === "+" || e.key === "=") setPrefs({ fontSize: Math.min(28, state.prefs.fontSize + 1) });
     else if (e.key === "-") setPrefs({ fontSize: Math.max(12, state.prefs.fontSize - 1) });
+    else if (e.key === "t" || e.key === "T") outline?.toggle();
+    else if (e.key === "b" || e.key === "B") outline?.toggleHere();
     else return;
     e.preventDefault();
   });
@@ -553,6 +563,26 @@ async function main() {
     toast,
   });
   finder = installSearch({ blocks: () => state.doc.blocks, getTranslations: () => state.tr });
+  outline = installOutline({
+    host,
+    getDoc: () => state.doc,
+    getTranslations: () => state.tr,
+    currentBlock: firstVisibleBlock,
+    getHighlights: () => state.highlights,
+    openHighlight: (id) => {
+      const h = state.highlights.find((x) => x.id === id);
+      const span = h && h.unitIds.map((u) => document.querySelector<HTMLElement>(`.s.marked[data-u="${CSS.escape(u)}"]`)).find(Boolean);
+      span?.click();
+    },
+    isOpen: () => state.prefs.outline,
+    getTab: () => state.prefs.outlineTab ?? "toc",
+    setOpen: (open: boolean, tab?: OutlineTab) => {
+      void setPrefs(tab ? { outline: open, outlineTab: tab } : { outline: open }, false);
+      outline?.syncOpen();
+    },
+    toast,
+  });
+  outline.refresh();
   const blockAction = installBlockAction({
     root: $("#doc"),
     blocks: state.blocks,

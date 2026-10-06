@@ -128,6 +128,12 @@ const host: ZbrHost = {
   async setPosition(b: string) {
     localStorage.setItem("zbr-pos", b);
   },
+  async getBookmarks() {
+    return JSON.parse(localStorage.getItem("zbr-marks") ?? "[]");
+  },
+  async setBookmarks(list: unknown[]) {
+    localStorage.setItem("zbr-marks", JSON.stringify(list));
+  },
   async getPrefs() {
     return { ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem("zbr-prefs") ?? "{}") } as ReaderPrefs;
   },

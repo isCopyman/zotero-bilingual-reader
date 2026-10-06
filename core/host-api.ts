@@ -51,6 +51,18 @@ export interface ReaderPrefs {
   pairStyle: PairStyle;
   /** CSS colour of the pair mark; empty follows the theme. */
   pairColor: string;
+  /** Side panel with the paper's headings and bookmarks: open, and which tab. */
+  outline: boolean;
+  outlineTab: "toc" | "marks" | "notes";
+}
+
+/** A place in the paper the reader marked. */
+export interface Bookmark {
+  blockId: string;
+  /** Start of the block's text: finds the place again in the other source (other block ids). */
+  text: string;
+  page?: number;
+  t: number;
 }
 
 export const DEFAULT_PREFS: ReaderPrefs = {
@@ -67,6 +79,8 @@ export const DEFAULT_PREFS: ReaderPrefs = {
   theme: "auto",
   pairStyle: "frame",
   pairColor: "",
+  outline: false,
+  outlineTab: "toc",
 };
 
 export interface EngineInfo {
@@ -167,6 +181,9 @@ export interface ZbrHost {
   /** Block the reader was last looking at in this paper, kept with the translation cache. */
   getPosition(): Promise<string | null>;
   setPosition(blockId: string): Promise<void>;
+  /** Bookmarks of this paper, kept with the translation cache. */
+  getBookmarks(): Promise<Bookmark[]>;
+  setBookmarks(list: Bookmark[]): Promise<void>;
 
   getPrefs(): Promise<ReaderPrefs>;
   setPrefs(p: Partial<ReaderPrefs>): Promise<void>;

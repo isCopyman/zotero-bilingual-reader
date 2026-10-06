@@ -875,6 +875,12 @@ export function createHost(attachment: any, opts: HostOptions = {}): ZoteroHost 
     async setPosition(blockId) {
       (await ready).store.position = blockId;
     },
+    async getBookmarks() {
+      return (await ready).store.bookmarks;
+    },
+    async setBookmarks(list) {
+      (await ready).store.bookmarks = list;
+    },
 
     async getPrefs() {
       return readPrefs();

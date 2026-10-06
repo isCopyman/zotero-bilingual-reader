@@ -718,8 +718,9 @@ describe("Bilingual Reader in Zotero", function () {
       swatch.click();
       const a = await waitFor(() => attachment.getAnnotations()[0], 5000);
       assert.equal(attachment.getAnnotations().length, 1);
-      // With "高亮附译文" on (default), the comment carries the Chinese translation for notes.
-      assert.match(a.annotationComment, /^【译】.*[一-鿿]/);
+      // "高亮附译文" is off by default: the comment stays the reader's own.
+      assert.isFalse((rdoc.getElementById("opt-hlzh") as HTMLInputElement).checked);
+      assert.notOk(a.annotationComment, "no comment");
       assert.equal(a.annotationType, "highlight");
       assert.match(a.annotationSortIndex, /^\d{5}\|\d{6}\|\d{5}$/);
       assert.include(span.textContent!.trim(), a.annotationText.slice(0, 30));
@@ -736,14 +737,38 @@ describe("Bilingual Reader in Zotero", function () {
       span.dispatchEvent(new rwin.MouseEvent("mouseup", { bubbles: true }));
       span.click();
       const card = await waitFor(() => [...rdoc.querySelectorAll<HTMLElement>(".peek")].find((p) => /高亮批注/.test(p.textContent!)), 3000);
-      assert.include(card.textContent!, "【译】");
-      await snap("07b-highlight-card");
+      assert.include(card.textContent!, "（无批注）");
       const [a] = attachment.getAnnotations();
       await host.updateHighlight({ id: a.key, comment: "测试批注", color: "#2ea8e5" });
       assert.equal(a.annotationComment, "测试批注");
       assert.equal(a.annotationColor, "#2ea8e5");
       await waitFor(() => span.style.getPropertyValue("--mark") === "#2ea8e5", 3000);
       rdoc.dispatchEvent(new rwin.KeyboardEvent("keydown", { key: "Escape" }));
+    });
+
+    it("puts the translation into the comment when 高亮附译文 is ticked", async function () {
+      const box = rdoc.getElementById("opt-hlzh") as HTMLInputElement;
+      box.click();
+      await waitFor(async () => (await host.getPrefs()).highlightWithZh === true, 3000, 50);
+      const other = [...rdoc.querySelectorAll<HTMLElement>("section.k-paragraph .en .s[data-u]")][24];
+      other.scrollIntoView({ block: "center" });
+      await sleep(300);
+      const range = rdoc.createRange();
+      range.selectNodeContents(other);
+      rwin.getSelection().removeAllRanges();
+      rwin.getSelection().addRange(range);
+      rdoc.dispatchEvent(new rwin.MouseEvent("mouseup", { bubbles: true }));
+      (await waitFor(() => rdoc.querySelector<HTMLElement>(".peek .swatch"), 3000)).click();
+      const a = await waitFor(() => attachment.getAnnotations().find((x: any) => /^【译】/.test(x.annotationComment)), 5000);
+      assert.match(a.annotationComment, /^【译】.*[一-鿿]/);
+      other.dispatchEvent(new rwin.MouseEvent("mouseup", { bubbles: true }));
+      other.click();
+      await waitFor(() => [...rdoc.querySelectorAll<HTMLElement>(".peek")].find((p) => /【译】/.test(p.textContent!)), 3000);
+      await snap("07b-highlight-card");
+      rdoc.dispatchEvent(new rwin.KeyboardEvent("keydown", { key: "Escape" }));
+      await a.eraseTx();
+      box.click();
+      await waitFor(async () => (await host.getPrefs()).highlightWithZh === false, 3000, 50);
     });
 
     it("drops the tint when the annotation is deleted elsewhere", async function () {

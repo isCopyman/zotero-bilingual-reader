@@ -1,7 +1,7 @@
 {
   "name": "zotero-bilingual-reader",
   "type": "module",
-  "version": "0.1.18",
+  "version": "0.1.19",
   "description": "Sentence-aligned bilingual reading for Zotero 10, with API and local agent translation.",
   "config": {
     "addonName": "Bilingual Reader",

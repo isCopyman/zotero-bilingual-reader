@@ -17,8 +17,11 @@ export interface MineruContentItem extends MineruItem {
 const SKIPPED = new Set(["header", "footer", "page_number", "aside_text", "discarded"]);
 
 /** Heading depth from its numbering: "II." 1, "B." 2, "3)" 3, "2.1" 2; unnumbered 1. */
-function headingLevel(text: string): number {
+export function headingLevel(text: string, prevLetter = ""): number {
   const t = text.trim();
+  // "C." after "B." is a sub-section letter, not the Roman numeral 100 (likewise I, V, X, L).
+  const one = /^([A-Z])\.\s/.exec(t)?.[1];
+  if (one && prevLetter && one.charCodeAt(0) === prevLetter.charCodeAt(0) + 1) return 2;
   if (/^[IVXLC]+\.\s/.test(t)) return 1;
   if (/^[A-Z]\.\s/.test(t)) return 2;
   if (/^\d+\)\s/.test(t)) return 3;
@@ -53,6 +56,7 @@ export function buildMineruDocument(items: MineruContentItem[], base: ZbrDocumen
     });
   };
 
+  let prevLetter = "";
   for (const it of items) {
     if (SKIPPED.has(it.type)) continue;
     switch (it.type) {
@@ -77,7 +81,11 @@ export function buildMineruDocument(items: MineruContentItem[], base: ZbrDocumen
         break;
       default:
         if (!it.text?.trim()) break;
-        if (it.text_level) add("heading", it.text, it, { level: headingLevel(it.text) });
+        if (it.text_level) {
+          const level = headingLevel(it.text, prevLetter);
+          prevLetter = level === 2 ? (/^\s*([A-Z])\./.exec(it.text)?.[1] ?? "") : level === 1 ? "" : prevLetter;
+          add("heading", it.text, it, { level });
+        }
         else add("paragraph", it.text, it);
     }
   }

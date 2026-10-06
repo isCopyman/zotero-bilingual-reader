@@ -47,6 +47,8 @@ function readPrefs(): ReaderPrefs {
     const saved = raw ? JSON.parse(raw) : {};
     // Before v2 every save wrote the old default autoTranslate=true, so it says nothing about a choice.
     if (!saved.v) delete saved.autoTranslate;
+    // Before v3 the same held for highlightWithZh=true (now off by default).
+    if ((saved.v ?? 0) < 3) delete saved.highlightWithZh;
     return { ...DEFAULT_PREFS, ...saved };
   } catch {
     return { ...DEFAULT_PREFS };
@@ -483,7 +485,15 @@ export function createHost(attachment: any, opts: HostOptions = {}): ZoteroHost 
       // The same highlight on the MinerU source's sentences, when there is one.
       const al = mineruItems ? await getAlignment() : null;
       if (al) unitIds.push(...new Set(unitIds.flatMap((id) => al.toMineru.get(id) ?? [])));
-      out.push({ id: a.key, color: a.annotationColor, unitIds, text: a.annotationText, comment: a.annotationComment || undefined });
+      out.push({
+        id: a.key,
+        color: a.annotationColor,
+        unitIds,
+        text: a.annotationText,
+        comment: a.annotationComment || undefined,
+        page: a.annotationPageLabel || String(pos.pageIndex + 1),
+        kind: a.annotationType,
+      });
     }
     return out;
   }
@@ -902,7 +912,7 @@ export function createHost(attachment: any, opts: HostOptions = {}): ZoteroHost 
       return readPrefs();
     },
     async setPrefs(p) {
-      setPref("readerPrefs", JSON.stringify({ ...readPrefs(), ...p, v: 2 }));
+      setPref("readerPrefs", JSON.stringify({ ...readPrefs(), ...p, v: 3 }));
     },
 
     dispose() {

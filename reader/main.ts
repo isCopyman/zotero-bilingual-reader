@@ -3,7 +3,7 @@ import type { Enrichment } from "../core/mineru";
 import type { Block, ZbrDocument } from "../core/model";
 import { installBlockAction } from "./block-action";
 import { observeFigures } from "./figures";
-import { installOutline, type OutlineTab } from "./outline";
+import { ICONS, installOutline, type OutlineTab } from "./outline";
 import { openMineruDialog } from "./mineru-dialog";
 import { installSearch } from "./search";
 import { handoffStatus, initHandoff, modal, openGlossary, openHandoff } from "./handoff";
@@ -325,7 +325,7 @@ function html(markup: string): DocumentFragment {
 function buildToolbar() {
   const bar = $("#toolbar");
   bar.replaceChildren(html(`
-    <button id="btn-outline" class="link" title="目录、书签和注释（快捷键 T）">目录</button>
+    <button id="btn-outline" class="icon" title="侧栏：目录、书签和注释（快捷键 T）">${ICONS.sidebar}</button>
     <div class="title" id="title"></div>
     <div class="seg" title="显示模式">
       <button data-mode="en" title="快捷键 1">英文</button><button data-mode="interleave" title="快捷键 2">对照</button><button data-mode="side" title="快捷键 3">左右</button><button data-mode="zh" title="快捷键 4">中文</button>
@@ -352,7 +352,7 @@ function buildToolbar() {
       <button id="opt-pair-reset" class="link" title="颜色跟随主题">默认色</button>
     </span>
     <label class="opt"><input type="checkbox" id="opt-auto"> 自动翻译</label>
-    <label class="opt" id="opt-hlzh-wrap" title="在双语页创建的高亮，把中文译文写进批注；用 Zotero 的“从注释添加笔记”时笔记里中英都有"><input type="checkbox" id="opt-hlzh"> 高亮附译文</label>
+    <label class="opt" id="opt-hlzh-wrap" title="勾选后，在双语页创建的高亮会把中文译文写进批注，用 Zotero 的“从注释添加笔记”时笔记里中英都有；默认不附"><input type="checkbox" id="opt-hlzh"> 高亮附译文</label>
     <div class="seg"><button id="font-dec" title="缩小字号（快捷键 -）">A−</button><button id="font-inc" title="放大字号（快捷键 +）">A+</button></div>
     <select id="engine" title="翻译引擎"></select>
     <button id="btn-translate" class="primary">翻译全文</button>

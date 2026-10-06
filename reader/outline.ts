@@ -4,6 +4,7 @@
 
 import type { Bookmark, HighlightView, ZbrHost } from "../core/host-api";
 import type { Block, ZbrDocument } from "../core/model";
+import { headingLevel } from "../core/mineru-doc";
 import { translationFor, type Translations } from "./render";
 
 export type OutlineTab = "toc" | "marks" | "notes";
@@ -36,17 +37,43 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = ""):
   return e;
 }
 
+// Icons in the style of Zotero's reader sidebar (20px, stroked in the current colour).
+const svg = (body: string) =>
+  `<svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+export const ICONS = {
+  sidebar: svg('<rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="M7.5 3.5v13"/>'),
+  toc: svg('<path d="M4 5h1M8 5h8M6 10h1M10 10h6M6 15h1M10 15h6"/>'),
+  marks: svg('<path d="M6 3.5h8a.5.5 0 0 1 .5.5v12.5L10 13.5l-4.5 3V4a.5.5 0 0 1 .5-.5z"/>'),
+  notes: svg('<rect x="3.5" y="5.5" width="11" height="11" rx="1.5"/><path d="M6.5 3.5h9a1 1 0 0 1 1 1v9"/><path d="M6.5 9h5M6.5 12h3.5"/>'),
+  chevron: '<svg viewBox="0 0 12 12" width="12" height="12" fill="currentColor"><path d="M4 2.5 8 6l-4 3.5z"/></svg>',
+  highlight: (color: string) =>
+    `<svg viewBox="0 0 16 16" width="16" height="16"><rect x="1.5" y="1.5" width="13" height="13" rx="2" fill="${color}" fill-opacity=".35" stroke="${color}"/><path d="M5 11.5 8 4.5l3 7M6.2 9h3.6" stroke="#333" stroke-width="1.2" fill="none" stroke-linecap="round"/></svg>`,
+  underline: (color: string) =>
+    `<svg viewBox="0 0 16 16" width="16" height="16"><path d="M5 3v5a3 3 0 0 0 6 0V3" stroke="#333" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M3 13.5h10" stroke="${color}" stroke-width="2.2" stroke-linecap="round"/></svg>`,
+};
+
+/** Static SVG markup to a node (not innerHTML: the privileged page sanitizes it). */
+function icon(markup: string): Element {
+  const doc = new DOMParser().parseFromString(`<body>${markup}</body>`, "text/html");
+  return document.importNode(doc.body.firstElementChild!, true);
+}
+
 const sectionOf = (blockId: string) => document.querySelector<HTMLElement>(`section.blk[data-b="${CSS.escape(blockId)}"]`);
 
 export function installOutline(ctx: OutlineCtx) {
   const panel = el("aside");
   panel.id = "outline";
   const tabs = el("div", "ol-tabs");
-  const tocTab = el("button", "", "目录");
-  const marksTab = el("button", "", "书签");
-  const notesTab = el("button", "", "注释");
-  const fold = el("button", "ol-close", "×");
-  fold.title = "收起（快捷键 T）";
+  const tab = (markup: string, title: string, cls = "") => {
+    const b = el("button", cls);
+    b.title = title;
+    b.append(icon(markup));
+    return b;
+  };
+  const tocTab = tab(ICONS.toc, "目录");
+  const marksTab = tab(ICONS.marks, "书签（B 添加）");
+  const notesTab = tab(ICONS.notes, "注释");
+  const fold = tab(ICONS.sidebar, "收起侧栏（T）", "ol-close");
   tabs.append(tocTab, marksTab, notesTab, fold);
   const toc = el("nav", "ol-toc");
   const marks = el("div", "ol-marks");
@@ -86,7 +113,7 @@ export function installOutline(ctx: OutlineCtx) {
     if (!s) return false;
     const top = s.getBoundingClientRect().top + window.scrollY - (tb?.getBoundingClientRect().bottom ?? 0) - 8;
     window.scrollTo({ top });
-    markCurrent();
+    markCurrent(blockId);
     s.classList.remove("ol-flash");
     void s.offsetWidth;
     s.classList.add("ol-flash");
@@ -103,15 +130,30 @@ export function installOutline(ctx: OutlineCtx) {
       toc.append(el("p", "ol-empty", "这篇论文没有识别出章节标题。"));
       return;
     }
-    const minLevel = Math.min(...list.map((b) => b.level ?? 1));
+    // Zotero's heading levels often ignore the numbering: a numbered heading ("II.", "B.", "3)",
+    // "2.1") takes its depth from the number, others keep the parser's level.
+    const numbered = /^\s*([IVXLC]+\.|[A-Z]\.|\d+\)|\d+(\.\d+)*\.?)\s/;
+    const levels = new Map<Block, number>();
+    let prevLetter = "";
+    for (const b of list) {
+      const lv = numbered.test(b.text) ? headingLevel(b.text, prevLetter) : (b.level ?? 1);
+      if (numbered.test(b.text)) prevLetter = lv === 2 ? (/^\s*([A-Z])\./.exec(b.text)?.[1] ?? "") : lv === 1 ? "" : prevLetter;
+      levels.set(b, lv);
+    }
+    const levelOf = (b: Block) => levels.get(b) ?? 1;
+    const minLevel = Math.min(...list.map(levelOf));
     list.forEach((b, i) => {
-      const level = (b.level ?? 1) - minLevel;
+      const level = levelOf(b) - minLevel;
       const item = el("div", "ol-item");
       item.dataset.b = b.id;
       item.dataset.level = String(level);
       item.style.paddingLeft = `${8 + level * 14}px`;
-      const hasChildren = (list[i + 1]?.level ?? 0) > (b.level ?? 1);
-      const twisty = el("span", "ol-twisty", hasChildren ? (collapsed.has(b.id) ? "▸" : "▾") : "");
+      const hasChildren = !!list[i + 1] && levelOf(list[i + 1]) > levelOf(b);
+      const twisty = el("span", "ol-twisty");
+      if (hasChildren) {
+        twisty.append(icon(ICONS.chevron));
+        twisty.classList.toggle("open", !collapsed.has(b.id));
+      }
       twisty.addEventListener("click", (e) => {
         e.stopPropagation();
         if (collapsed.has(b.id)) collapsed.delete(b.id);
@@ -132,7 +174,7 @@ export function installOutline(ctx: OutlineCtx) {
     // Hide the sub-sections of folded headings.
     let hideBelow = Infinity;
     for (const h of headings) {
-      const lv = h.block.level ?? 1;
+      const lv = levelOf(h.block);
       if (lv <= hideBelow) hideBelow = Infinity;
       h.item.hidden = hideBelow !== Infinity;
       if (!h.item.hidden && collapsed.has(h.block.id)) hideBelow = lv;
@@ -140,11 +182,11 @@ export function installOutline(ctx: OutlineCtx) {
   }
 
   /** The heading whose section is at the top of the view. */
-  function markCurrent() {
+  function markCurrent(jumpedTo?: string) {
     if (panel.hidden || toc.hidden || !headings.length) return;
-    const limit = (tb?.getBoundingClientRect().bottom ?? 0) + 40;
-    let cur: HTMLElement | null = null;
-    for (const h of headings) {
+    const limit = (tb?.getBoundingClientRect().bottom ?? 0) + 100;
+    let cur: HTMLElement | null = headings.find((h) => h.block.id === jumpedTo)?.item ?? null;
+    if (!cur) for (const h of headings) {
       const s = sectionOf(h.block.id);
       if (!s) continue;
       if (s.getBoundingClientRect().top > limit) break;
@@ -180,6 +222,7 @@ export function installOutline(ctx: OutlineCtx) {
     for (const m of bookmarks) {
       const b = resolve(m);
       const item = el("div", "ol-item ol-mark");
+      item.append(icon(ICONS.marks));
       const text = el("span", "ol-text");
       const head = b ? sectionTitle(b) : "";
       const page = b?.pageRects[0]?.[0] ?? m.page;
@@ -247,15 +290,19 @@ export function installOutline(ctx: OutlineCtx) {
       .map((h) => ({ h, at: Math.min(...h.unitIds.map((u) => order.get(u) ?? Infinity)) }))
       .filter((x) => x.at !== Infinity)
       .sort((a, b) => a.at - b.at);
-    notesTab.textContent = shown.length ? `注释 ${shown.length}` : "注释";
+    notesTab.title = shown.length ? `注释（${shown.length} 条）` : "注释";
+    notesTab.dataset.count = shown.length ? String(shown.length) : "";
     if (!shown.length) {
-      notes.append(el("p", "ol-empty", "这篇还没有高亮。选中句子后点色块即可高亮（同时建在原 PDF 上）；在 PDF 里做的高亮也会列在这里。"));
+      notes.append(el("p", "ol-empty", "这篇还没有高亮。选中句子后点色块即可高亮（就是 Zotero 的注释，PDF 阅读器里同样显示）；在 PDF 阅读器里做的高亮也会列在这里。"));
       return;
     }
     for (const { h } of shown) {
+      // Zotero's annotation card: type icon and page, the quoted text, the comment.
       const item = el("div", "ol-note");
       item.style.setProperty("--mark", h.color);
-      item.append(el("div", "ol-note-text", h.text || "（无文字）"));
+      const head = el("div", "ol-note-head");
+      head.append(icon(h.kind === "underline" ? ICONS.underline(h.color) : ICONS.highlight(h.color)), el("span", "", h.page ? `页 ${h.page}` : ""));
+      item.append(head, el("div", "ol-note-text", h.text || "（无文字）"));
       if (h.comment) item.append(el("div", "ol-note-comment", h.comment));
       item.title = "点击跳到这句；再点一次打开批注卡片";
       item.addEventListener("click", () => {

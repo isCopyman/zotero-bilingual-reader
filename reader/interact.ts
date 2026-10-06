@@ -143,7 +143,7 @@ function editor(bar: HTMLElement, initial: string, save: (text: string) => void)
   const ta = document.createElement("textarea");
   ta.value = initial;
   ta.rows = 3;
-  ta.placeholder = "批注（保存到原 PDF 的这条高亮上）";
+  ta.placeholder = "批注（保存在这条高亮的 Zotero 注释里）";
   const ok = document.createElement("button");
   ok.textContent = "保存";
   ok.addEventListener("click", () => save(ta.value));
@@ -202,15 +202,15 @@ function actionBar(ctx: InteractCtx, ids: string[]): HTMLElement {
         .then(() => {
           hidePopover();
           window.getSelection()?.removeAllRanges();
-          ctx.toast("已添加高亮（保存在原 PDF 上）");
+          ctx.toast("已添加高亮（Zotero 注释，PDF 阅读器里也能看到）");
         })
         .catch((e) => ctx.toast(`高亮失败：${e?.message ?? e}`));
     for (const c of HIGHLIGHT_COLORS) {
-      const b = btn("", () => void create(c), ctx.getHighlightWithZh() ? "高亮到原 PDF，批注里附中文译文" : "高亮到原 PDF");
+      const b = btn("", () => void create(c), ctx.getHighlightWithZh() ? "添加高亮（Zotero 注释，批注里附中文译文）" : "添加高亮（Zotero 注释，PDF 阅读器里同样显示）");
       b.className = "swatch";
       b.style.background = c;
     }
-    btn("高亮并批注…", () => editor(bar, "", (note) => create(HIGHLIGHT_COLORS[0], note)), "写一条批注，和高亮一起保存到原 PDF");
+    btn("高亮并批注…", () => editor(bar, "", (note) => create(HIGHLIGHT_COLORS[0], note)), "写一条批注，和高亮一起保存为 Zotero 注释");
   }
   return bar;
 }
@@ -233,7 +233,7 @@ function highlightBar(ctx: InteractCtx, h: HighlightView): HTMLElement {
     editor(bar, h.comment ?? "", (comment) =>
       ctx.host.updateHighlight({ id: h.id, comment }).then(() => {
         hidePopover();
-        ctx.toast("批注已保存到原 PDF");
+        ctx.toast("批注已保存");
       }, fail),
     ),
   );
@@ -244,7 +244,7 @@ function highlightBar(ctx: InteractCtx, h: HighlightView): HTMLElement {
     b.style.background = c;
   }
   btn("删除高亮", () => {
-    if (!window.confirm("从原 PDF 删除这条高亮及其批注？")) return;
+    if (!window.confirm("删除这条高亮及其批注？（Zotero 的 PDF 阅读器里也会一并删除）")) return;
     ctx.host.deleteHighlight(h.id).then(() => {
       hidePopover();
       ctx.toast("已删除高亮");

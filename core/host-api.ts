@@ -74,7 +74,8 @@ export const DEFAULT_PREFS: ReaderPrefs = {
   // Translation costs quota: it starts when the reader asks for it (toolbar, paragraph button).
   autoTranslate: false,
   engineId: "",
-  highlightWithZh: true,
+  // Off: a highlight's comment is the reader's own; the translation is one click away anyway.
+  highlightWithZh: false,
   source: "zotero",
   theme: "auto",
   pairStyle: "frame",
@@ -98,6 +99,10 @@ export interface HighlightView {
   unitIds: string[];
   text?: string;
   comment?: string;
+  /** Page label as Zotero shows it. */
+  page?: string;
+  /** "highlight" or "underline". */
+  kind?: string;
 }
 
 export interface HandoffInfo {

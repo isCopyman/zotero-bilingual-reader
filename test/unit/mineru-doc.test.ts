@@ -50,3 +50,13 @@ describe("inline math check", () => {
     expect(lostMath("the input $x_t$ and $[1]$", "输入 x_t 与 $[1]$")).toEqual(["$x_t$"]);
   });
 });
+
+describe("heading levels", () => {
+  it("reads a letter after the previous one as a sub-section, not a Roman numeral", async () => {
+    const { headingLevel } = await import("../../core/mineru-doc");
+    expect(headingLevel("C. Residual Module", "B")).toBe(2);
+    expect(headingLevel("I. INTRODUCTION")).toBe(1);
+    expect(headingLevel("V. CONCLUSION", "C")).toBe(1);
+    expect(headingLevel("I. Item nine", "H")).toBe(2);
+  });
+});

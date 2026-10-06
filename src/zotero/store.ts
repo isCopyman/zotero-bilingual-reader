@@ -156,6 +156,15 @@ export class TranslationStore {
     this.scheduleWrite();
   }
 
+  /** Drop the translations of these sentences; everything else stays. */
+  remove(hashes: Iterable<string>) {
+    for (const h of hashes) delete this.data.units[h];
+    // Written as is: merging the file back in would restore what was just removed.
+    this.replace = true;
+    this.rev++;
+    this.scheduleWrite();
+  }
+
   get glossary(): string | undefined {
     return this.data.glossary;
   }

@@ -5,7 +5,7 @@ import { installBlockAction } from "./block-action";
 import { observeFigures } from "./figures";
 import { openMineruDialog } from "./mineru-dialog";
 import { installSearch } from "./search";
-import { handoffStatus, initHandoff, openGlossary, openHandoff } from "./handoff";
+import { handoffStatus, initHandoff, modal, openGlossary, openHandoff } from "./handoff";
 import { installInteractions } from "./interact";
 import { setRich } from "./richtext";
 import { indexSpans, spansOf } from "./spans";
@@ -301,7 +301,7 @@ function syncToolbar() {
   $("#opt-peek").classList.toggle("dim", state.prefs.mode === "interleave" || state.prefs.mode === "side");
   ($("#opt-auto") as HTMLInputElement).checked = state.prefs.autoTranslate;
   ($("#opt-hlzh") as HTMLInputElement).checked = state.prefs.highlightWithZh;
-  $("#opt-hlzh-wrap").hidden = !state.host.capabilities.highlights || isMineruDoc();
+  $("#opt-hlzh-wrap").hidden = !state.host.capabilities.highlights;
   updateProgressText();
 }
 
@@ -352,7 +352,7 @@ function buildToolbar() {
     <span id="progress"></span>
     <button id="btn-handoff" title="让你自己打开的 Agent 会话通读全文、统一术语后整篇译完；插件给出提示词并接收结果">交给 Agent…</button>
     <button id="btn-glossary" class="link" title="查看或修改这篇论文的术语表">术语表</button>
-    <button id="btn-clear" class="link" title="删除这篇论文的全部缓存译文（含手动修改的），之后可以用当前引擎重新翻译">清除译文</button>
+    <button id="btn-clear" class="link" title="删除这篇论文的缓存译文（含手动修改的），之后可以用当前引擎重新翻译；有两个来源时可以只清除当前来源">清除译文</button>
     <button id="btn-popout" class="link" title="移到单独的窗口（放在屏幕右半边）；Zotero 窗口按 Win+← 贴到左边，就是左边 PDF、右边双语">新窗口</button>`));
   bar.querySelectorAll<HTMLElement>("[data-mode]").forEach((b) => b.addEventListener("click", () => setPrefs({ mode: b.dataset.mode as Mode })));
   bar.querySelectorAll<HTMLElement>("[data-gran]").forEach((b) =>
@@ -395,16 +395,43 @@ function buildToolbar() {
   $("#btn-popout").hidden = !state.host.popOut;
   $("#btn-popout").addEventListener("click", () => void state.host.popOut?.());
   $("#btn-glossary").addEventListener("click", () => void openGlossary());
-  $("#btn-clear").addEventListener("click", async () => {
-    if (!confirm("删除这篇论文的全部译文缓存（包括你手动修改的译文）？删除后可以重新翻译。")) return;
+  $("#btn-clear").addEventListener("click", () => void confirmClear());
+  $("#engine").addEventListener("change", (e) => setPrefs({ engineId: (e.target as HTMLSelectElement).value }, false));
+}
+
+/** With two sources, ask which translations go; otherwise a plain confirmation. */
+async function confirmClear() {
+  const clear = async (scope: "source" | "all") => {
     try {
-      await state.host.clearTranslations();
+      await state.host.clearTranslations(scope);
       location.reload();
     } catch (err: any) {
       toast(`清除失败：${err?.message ?? err}`);
     }
-  });
-  $("#engine").addEventListener("change", (e) => setPrefs({ engineId: (e.target as HTMLSelectElement).value }, false));
+  };
+  if (!state.hasMineru) {
+    if (confirm("删除这篇论文的全部译文缓存（包括你手动修改的译文）？删除后可以重新翻译。")) await clear("all");
+    return;
+  }
+  const here = isMineruDoc() ? "MinerU" : "Zotero";
+  const back = modal("清除译文");
+  const body = back.querySelector(".ho-body")!;
+  const p = document.createElement("p");
+  p.className = "ho-intro";
+  p.textContent = `两个来源各有一份译文，只有文字完全相同的句子共用一条。清除当前来源（${here}）时，这些共用的句子在另一个来源里也会变回未翻译；手动修改过的译文同样会被删除。`;
+  const actions = document.createElement("div");
+  actions.className = "ho-actions";
+  const mk = (text: string, scope: "source" | "all") => {
+    const b = document.createElement("button");
+    b.textContent = text;
+    b.addEventListener("click", () => {
+      back.remove();
+      void clear(scope);
+    });
+    return b;
+  };
+  actions.append(mk(`只清除 ${here} 来源`, "source"), mk("清除两个来源的全部译文", "all"));
+  body.append(p, actions);
 }
 
 async function fillEngines() {
@@ -521,7 +548,8 @@ async function main() {
     getPeek: () => state.prefs.peek,
     getHighlights: () => state.highlights,
     getHighlightWithZh: () => state.prefs.highlightWithZh,
-    canHighlight: () => host.capabilities.highlights && !isMineruDoc(),
+    // MinerU sentences are highlighted through the Zotero text they were aligned with.
+    canHighlight: () => host.capabilities.highlights,
     toast,
   });
   finder = installSearch({ blocks: () => state.doc.blocks, getTranslations: () => state.tr });

@@ -128,7 +128,8 @@ export interface ZbrHost {
   /** Replace one sentence's translation with the reader's own wording (kept until retranslated). */
   editTranslation(unitId: string, zh: string): Promise<void>;
   /** Forget every cached translation of this paper (Zotero and MinerU text alike). */
-  clearTranslations(): Promise<void>;
+  /** Drop cached translations: of the source on screen, or of both sources ("all", default). */
+  clearTranslations(scope?: "source" | "all"): Promise<void>;
 
   /** Key terms used by batch translation of this paper (English = 中文 lines); null until made. */
   getPaperGlossary(): Promise<string | null>;

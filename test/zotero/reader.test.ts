@@ -858,8 +858,28 @@ describe("Bilingual Reader in Zotero", function () {
       await waitFor(() => block.querySelector(".zh .s:not(.pending) .ktx .katex"), 20_000);
       assert.match(block.querySelector(".zh")!.textContent!, /【测试】/);
       await snap("09-mineru-source");
-      // Highlights need Zotero's geometry: not offered on MinerU text.
-      assert.isTrue((rdoc.getElementById("opt-hlzh-wrap") as HTMLElement).hidden);
+      // Highlights on MinerU text go to the PDF through the aligned Zotero text, and show here.
+      assert.isFalse((rdoc.getElementById("opt-hlzh-wrap") as HTMLElement).hidden);
+      const plain = [...rdoc.querySelectorAll<HTMLElement>('section.k-paragraph[data-b^="m"] .en .s[data-u]')].filter((e) => !e.querySelector(".ktx") && e.textContent!.length > 80)[10];
+      plain.scrollIntoView({ block: "center" });
+      const n0 = attachment.getAnnotations().length;
+      await host.createHighlight({ unitIds: [plain.dataset.u], color: "#ffd400" });
+      const a = await waitFor(() => attachment.getAnnotations().length > n0 && attachment.getAnnotations().find((x: any) => !x.annotationComment), 5000);
+      const words = (t: string) => t.toLowerCase().replace(/[^a-z]/g, "");
+      assert.equal(words(a.annotationText), words(plain.textContent!), "PDF highlight covers the same words");
+      await waitFor(() => plain.classList.contains("marked"), 5000);
+      plain.scrollIntoView({ block: "center" });
+      await sleep(300);
+      await snap("09b-mineru-highlight");
+      await a.eraseTx();
+      await waitFor(() => !plain.classList.contains("marked"), 5000);
+      // "Locate in PDF" from a MinerU sentence opens the PDF at the aligned Zotero text.
+      const win = Zotero.getMainWindow() as any;
+      await host.openInPdf({ blockId: plain.dataset.u!.split(":")[0], unitIds: [plain.dataset.u] });
+      const reader = await waitFor(() => Z.Reader._readers.find((r: any) => r.itemID === attachment.id), 30_000);
+      win.Zotero_Tabs.close(reader.tabID);
+      win.Zotero_Tabs.select(win.Zotero_Tabs._tabs.find((t: any) => t.type === "zbr").id);
+      await sleep(500);
       source.value = "zotero";
       source.dispatchEvent(new rwin.Event("change", { bubbles: true }));
       await waitFor(() => rdoc.querySelector('section.blk[data-b="12"]'), 20_000);
@@ -874,8 +894,16 @@ describe("Bilingual Reader in Zotero", function () {
       assert.notEqual(rwin.getComputedStyle(rdoc.documentElement).getPropertyValue("--peek-bg").trim(), "");
       const before = Object.keys(await host.getTranslations()).length;
       assert.isAbove(before, 10);
-      await host.clearTranslations();
+      // Only the source on screen: the MinerU-only sentence translated above survives.
+      await host.clearTranslations("source");
       assert.equal(Object.keys(await host.getTranslations()).length, 0);
+      await host.setPrefs({ source: "mineru" });
+      assert.isAbove(Object.keys(await host.getTranslations()).length, 0, "MinerU translations kept");
+      await host.setPrefs({ source: "zotero" });
+      await host.clearTranslations();
+      await host.setPrefs({ source: "mineru" });
+      assert.equal(Object.keys(await host.getTranslations()).length, 0, "both sources cleared");
+      await host.setPrefs({ source: "zotero" });
     });
 
     it("hands the whole paper to an agent the reader runs, and follows it through the folder", async function () {

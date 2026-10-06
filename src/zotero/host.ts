@@ -13,6 +13,7 @@ import { glossaryPrompt, mergeGlossaries, parseGlossary } from "../../core/trans
 import { buildUnitsFile, collect, expectedUnits, FIX_FILE, FIX_RESULT_FILE, fixPrompt, fixText, handoffPhase, PARTS_DIR, RESULT_FILE, startCommands, startPrompt, taskText, type Collected, type Expected, type FixItem } from "../../core/translate/whole";
 import { cleanupAgentSessions, engineConcurrency, engineConfigKey, getEngine, listEngines } from "./engines";
 import { getPref, setPref } from "./prefs";
+import { alignDocuments, type Alignment } from "../../core/align";
 import { parseOnMineruCloud } from "./mineru-cloud";
 import { TranslationStore } from "./store";
 import { clearTimeout, newAbortController, setTimeout, subtleCrypto } from "./globals";
@@ -119,16 +120,50 @@ export function createHost(attachment: any, opts: HostOptions = {}): ZoteroHost 
   // The document shown follows the "source" preference; blocks of both documents share one map
   // (ids differ: SDT paths vs "m…"), so the scheduler serves whichever is on screen.
   let mineruDoc: Promise<ZbrDocument | null> | null = null;
-  async function activeDoc(): Promise<ZbrDocument> {
+  const loadMineruDoc = async () => {
     const { doc, blocks } = await ready;
-    if ((opts.source ?? readPrefs().source) !== "mineru") return doc;
     mineruDoc ??= loadMineru().then((items) => {
       if (!items) return null;
       const m = buildMineruDocument(items, doc, attachment.key);
       for (const b of m.blocks) blocks.set(b.id, b);
       return m;
     });
-    return (await mineruDoc) ?? doc;
+    return mineruDoc;
+  };
+  const usingMineru = () => (opts.source ?? readPrefs().source) === "mineru";
+  async function activeDoc(): Promise<ZbrDocument> {
+    const { doc } = await ready;
+    if (!usingMineru()) return doc;
+    return (await loadMineruDoc()) ?? doc;
+  }
+  // MinerU sentences mapped onto the Zotero text, which alone carries PDF geometry.
+  let alignment: Promise<Alignment | null> | null = null;
+  const getAlignment = () =>
+    (alignment ??= (async () => {
+      const m = await loadMineruDoc();
+      return m ? alignDocuments((await ready).doc, m) : null;
+    })().catch((e) => {
+      Zotero.logError(e);
+      return null;
+    }));
+  /** Pieces of SDT text behind a sentence of either source (a MinerU one via the alignment). */
+  async function sdtPieces(unitIds: string[]): Promise<{ block: Block; start: number; end: number }[]> {
+    const { blocks } = await ready;
+    const out: { block: Block; start: number; end: number }[] = [];
+    for (const id of unitIds) {
+      const block = blocks.get(id.slice(0, id.lastIndexOf(":")));
+      const s = block?.sentences.find((x) => x.id === id);
+      if (!block || !s) continue;
+      if (!block.id.startsWith("m")) {
+        out.push({ block, start: s.start, end: s.end });
+        continue;
+      }
+      for (const p of (await getAlignment())?.toSdt.get(id) ?? []) {
+        const b = blocks.get(p.blockId);
+        if (b) out.push({ block: b, start: p.start, end: p.end });
+      }
+    }
+    return out;
   }
 
   // Scheduler. Blocks wait in `queue`; pump() turns them into jobs and starts at most
@@ -431,6 +466,9 @@ export function createHost(attachment: any, opts: HostOptions = {}): ZoteroHost 
       const unitIds = locator.unitsAt({ pageIndex: pos.pageIndex, rects: pos.rects });
       if (pos.nextPageRects) unitIds.push(...locator.unitsAt({ pageIndex: pos.pageIndex + 1, rects: pos.nextPageRects }));
       if (!unitIds.length) continue;
+      // The same highlight on the MinerU source's sentences, when there is one.
+      const al = mineruItems ? await getAlignment() : null;
+      if (al) unitIds.push(...new Set(unitIds.flatMap((id) => al.toMineru.get(id) ?? [])));
       out.push({ id: a.key, color: a.annotationColor, unitIds, text: a.annotationText, comment: a.annotationComment || undefined });
     }
     return out;
@@ -605,10 +643,13 @@ export function createHost(attachment: any, opts: HostOptions = {}): ZoteroHost 
       emit({ type: "translations", units: { [unitId]: { zh: text, srcHash: s.hash } } });
     },
 
-    async clearTranslations() {
+    async clearTranslations(scope = "all") {
       await host.cancel();
       const { store } = await ready;
-      store.clear();
+      if (scope === "source") {
+        // Sentences of the source on screen; the same sentence in the other source shares the entry.
+        store.remove((await activeDoc()).blocks.flatMap((b) => b.sentences.map((s) => s.hash)));
+      } else store.clear();
       await store.flush();
       progress.done = progress.total = progress.failed = 0;
       failedUnits.clear();
@@ -746,6 +787,7 @@ export function createHost(attachment: any, opts: HostOptions = {}): ZoteroHost 
         });
         mineruItems = null;
         mineruDoc = null;
+        alignment = null;
         emitProgress("MinerU 解析完成");
       } catch (e: any) {
         emitProgress(`MinerU 解析失败：${e?.message ?? e}`);
@@ -758,8 +800,8 @@ export function createHost(attachment: any, opts: HostOptions = {}): ZoteroHost 
       const block = blocks.get(target.blockId);
       if (!block) return;
       let pos: PagePosition | undefined = undefined;
-      for (const id of target.unitIds ?? []) {
-        pos = locator.unitPositions(block, id)[0];
+      for (const p of await sdtPieces(target.unitIds ?? [])) {
+        pos = mergeLineRects(locator.charRects(p.block, p.start, p.end))[0];
         if (pos) break;
       }
       if (!pos && block.pageRects.length) {
@@ -775,14 +817,12 @@ export function createHost(attachment: any, opts: HostOptions = {}): ZoteroHost 
     },
 
     async createHighlight(req) {
-      const { doc, locator, blocks } = await ready;
-      // Character rects of every selected sentence, in reading order.
-      const units = req.unitIds
-        .map((id) => ({ id, block: blocks.get(id.slice(0, id.lastIndexOf(":"))) }))
-        .map(({ id, block }) => ({ block, s: block?.sentences.find((x) => x.id === id) }))
-        .filter((u): u is { block: Block; s: Block["sentences"][number] } => !!u.block && !!u.s);
-      if (!units.length) throw new Error("所选句子没有对应的 PDF 位置");
-      const chars = units.flatMap(({ block, s }) => locator.charRects(block, s.start, s.end).map((c) => ({ ...c, unit: s, block })));
+      const { doc, locator } = await ready;
+      // Character rects of every selected sentence, in reading order; MinerU sentences through
+      // the Zotero text they were aligned with.
+      const pieces = await sdtPieces(req.unitIds);
+      if (!pieces.length) throw new Error("所选句子没有对应的 PDF 位置");
+      const chars = pieces.flatMap((p) => locator.charRects(p.block, p.start, p.end).map((c) => ({ ...c, piece: p, block: p.block })));
       const pages = [...new Set(chars.map((c) => c.pageIndex))];
       if (!pages.length) throw new Error("所选句子没有对应的 PDF 位置");
       // Zotero highlights live on one page each; a selection across pages becomes one per page.
@@ -790,15 +830,15 @@ export function createHost(attachment: any, opts: HostOptions = {}): ZoteroHost 
         const onPage = chars.filter((c) => c.pageIndex === pageIndex);
         const [pos] = mergeLineRects(onPage);
         const first = onPage[0];
-        const pageUnits = [...new Set(onPage.map((c) => c.unit))];
+        const pagePieces = [...new Set(onPage.map((c) => c.piece))];
         const height = doc.pages[pageIndex]?.height ?? 792;
         const top = Math.max(0, Math.floor(height - Math.max(...pos.rects.map((r) => r[3]))));
-        const offset = locator.pageOffset(first.block, first.unit.start);
+        const offset = locator.pageOffset(first.block, first.piece.start);
         const pad = (n: number, w: number) => String(Math.max(0, Math.min(n, 10 ** w - 1))).padStart(w, "0");
         await (Zotero as any).Annotations.saveFromJSON(attachment, {
           key: (Zotero as any).DataObjectUtilities.generateKey(),
           type: "highlight",
-          text: pageUnits.map((u) => u.text.trim()).join(" "),
+          text: pagePieces.map((p) => p.block.text.slice(p.start, p.end).trim()).join(" "),
           comment: req.comment ?? "",
           color: req.color,
           pageLabel: doc.pages[pageIndex]?.label ?? String(pageIndex + 1),

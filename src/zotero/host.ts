@@ -13,6 +13,7 @@ import { glossaryPrompt, mergeGlossaries, parseGlossary } from "../../core/trans
 import { buildUnitsFile, collect, expectedUnits, FIX_FILE, FIX_RESULT_FILE, fixPrompt, fixText, handoffPhase, PARTS_DIR, RESULT_FILE, startCommands, startPrompt, taskText, type Collected, type Expected, type FixItem } from "../../core/translate/whole";
 import { cleanupAgentSessions, engineConcurrency, engineConfigKey, getEngine, listEngines } from "./engines";
 import { getPref, setPref } from "./prefs";
+import { looseKey } from "../../core/hash";
 import { alignDocuments, type Alignment } from "../../core/align";
 import { parseOnMineruCloud } from "./mineru-cloud";
 import { TranslationStore } from "./store";
@@ -126,9 +127,22 @@ export function createHost(attachment: any, opts: HostOptions = {}): ZoteroHost 
       if (!items) return null;
       const m = buildMineruDocument(items, doc, attachment.key);
       for (const b of m.blocks) blocks.set(b.id, b);
+      linkSources(doc, m);
       return m;
     });
     return mineruDoc;
+  };
+  /** The same sentence in both sources shares its translation (quotes, bullets, hyphens aside). */
+  const linkSources = async (doc: ZbrDocument, m: ZbrDocument) => {
+    const { store } = await ready;
+    const groups = new Map<string, string[]>();
+    for (const d of [doc, m])
+      for (const b of d.blocks)
+        for (const s of b.sentences) {
+          const k = looseKey(s.text);
+          if (k) groups.set(k, [...(groups.get(k) ?? []), s.hash]);
+        }
+    for (const hashes of groups.values()) store.link(hashes);
   };
   const usingMineru = () => (opts.source ?? readPrefs().source) === "mineru";
   async function activeDoc(): Promise<ZbrDocument> {
@@ -740,6 +754,8 @@ export function createHost(attachment: any, opts: HostOptions = {}): ZoteroHost 
     getPdfData,
 
     async getEnrichment() {
+      // Also builds the MinerU document, which links shared sentences to one translation.
+      await loadMineruDoc();
       const items = await loadMineru();
       if (!items) return null;
       const { doc } = await ready;

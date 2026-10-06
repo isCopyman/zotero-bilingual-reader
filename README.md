@@ -74,7 +74,7 @@
 
 ### 其他
 
-- **两种正文来源**：Zotero 自带的结构化文本，或 MinerU 解析结果（行内公式也排版）。MinerU 文本按字符对齐到 Zotero 文本上，所以在 MinerU 来源下同样能显示和创建 PDF 高亮、在 PDF 中定位。两个来源各有一份译文，文字完全相同的句子共用；“清除译文”可以只清除当前来源。
+- **两种正文来源**：Zotero 自带的结构化文本，或 MinerU 解析结果（行内公式也排版）。MinerU 文本按字符对齐到 Zotero 文本上，所以在 MinerU 来源下同样能显示和创建 PDF 高亮、在 PDF 中定位。两个来源各有一份译文，同一句话共用一条（引号、项目符号、行末断词的连字符、“Table 1”这类标号不同也算同一句），含公式的句子两边各自翻译；“清除译文”可以只清除当前来源。
 - **阅读位置**：重新打开时回到上次读到的位置。
 - **失败句一键重试**：工具栏“失败 N 句，重试”只重发失败的句子。
 - **文库预翻译**：文库里多选条目，右键“预翻译（双语阅读）”，后台逐篇翻译，不打开标签页。
@@ -138,7 +138,7 @@
 
 ## 数据位置
 
-- 译文缓存：`<Zotero 数据目录>/zotero-bilingual-reader/translations/<库ID>-<附件key>.json`，设置面板可以直接打开这个目录。阅读位置和本篇术语表也存在这里。译文按句子内容的哈希存放，Zotero 和 MinerU 两个来源里相同的句子共用译文。
+- 译文缓存：`<Zotero 数据目录>/zotero-bilingual-reader/translations/<库ID>-<附件key>.json`，设置面板可以直接打开这个目录。阅读位置和本篇术语表也存在这里。译文按句子内容的哈希存放，Zotero 和 MinerU 两个来源里的同一句话共用译文。
 - 整篇翻译任务：`<Zotero 数据目录>/zotero-bilingual-reader/jobs/`。
 - MinerU 解析：`<Zotero 数据目录>/mineru-paper-store/attachments/<附件key>/`（目录可在设置里改）。`parse.json` 里的 `pdfSha256` 与当前 PDF 一致才使用；插件只在你点“MinerU 解析…”时往这里写入。格式见 [docs/mineru.md](docs/mineru.md)。
 - 写进 Zotero 文库的只有你主动创建的高亮和批注，和在 Zotero 阅读器里做的高亮完全一样。

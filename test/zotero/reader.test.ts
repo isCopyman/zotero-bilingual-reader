@@ -122,6 +122,18 @@ describe("Bilingual Reader in Zotero", function () {
     assert.isTrue(r.ok, `SDT unavailable: ${JSON.stringify(diag)}`);
   });
 
+  it("dumps the structured text of another paper (diagnostic, ZBR_DUMP_PDF)", async function () {
+    const pdf = String(Z.Prefs.get(`${PREFIX}.dumpPdf`, true) || "");
+    if (!pdf) return this.skip();
+    this.timeout(300_000);
+    const att = await Z.Attachments.importFromFile({ file: pdf, libraryID: Z.Libraries.userLibraryID });
+    const reader = await Z.SDT.getReader(att.id, { isPriority: true });
+    const sdt = await reader.materialize();
+    await IOUtils.makeDirectory(outDir(), { createAncestors: true, ignoreExisting: true });
+    await IOUtils.writeJSON(PathUtils.join(outDir(), "dump-sdt.json"), sdt);
+    await att.eraseTx();
+  });
+
   it("opens a bilingual tab and renders the paper", async function () {
     await Z.ZBR.api.openBilingual(attachment);
     const win = Zotero.getMainWindow() as any;

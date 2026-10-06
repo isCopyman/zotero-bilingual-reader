@@ -139,13 +139,32 @@ export class TranslationStore {
     return new TranslationStore(path, data, mtime);
   }
 
+  /**
+   * Hashes of the same sentence as parsed by the other source (see looseKey): they share one
+   * translation. Kept in memory only; rebuilt each time both documents of the paper are loaded.
+   */
+  private siblings = new Map<string, string[]>();
+
+  link(hashes: string[]) {
+    const all = [...new Set(hashes)];
+    if (all.length < 2) return;
+    for (const h of all) this.siblings.set(h, all.filter((x) => x !== h));
+    // Translations that now apply to more sentences: let watchers look again.
+    this.rev++;
+  }
+
   get(hash: string): CachedUnit | undefined {
-    return this.data.units[hash];
+    const own = this.data.units[hash];
+    if (own) return own;
+    for (const h of this.siblings.get(hash) ?? []) if (this.data.units[h]) return this.data.units[h];
+    return undefined;
   }
 
   put(hash: string, zh: string, engine: string, glossary: string) {
     const g = glossary.trim() ? Zotero.Utilities.Internal.md5(glossary.trim(), false).slice(0, 8) : "";
-    this.data.units[hash] = { zh, engine, prompt: PROMPT_VERSION, glossary: g, t: Date.now() };
+    const unit = { zh, engine, prompt: PROMPT_VERSION, glossary: g, t: Date.now() };
+    // A retranslation or hand edit holds for the sentence in both sources.
+    for (const h of [hash, ...(this.siblings.get(hash) ?? [])]) this.data.units[h] = { ...unit };
     this.rev++;
     this.scheduleWrite();
   }
@@ -161,7 +180,7 @@ export class TranslationStore {
 
   /** Drop the translations of these sentences; everything else stays. */
   remove(hashes: Iterable<string>) {
-    for (const h of hashes) delete this.data.units[h];
+    for (const h of hashes) for (const x of [h, ...(this.siblings.get(h) ?? [])]) delete this.data.units[x];
     // Written as is: merging the file back in would restore what was just removed.
     this.replace = true;
     this.rev++;

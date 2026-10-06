@@ -65,6 +65,8 @@ export default defineConfig({
       [`${pkg.config.prefsPrefix}.test.perfPdf`]: process.env.ZBR_PERF_PDF ?? "",
       [`${pkg.config.prefsPrefix}.test.perfMineru`]: process.env.ZBR_PERF_MINERU ?? "",
       [`${pkg.config.prefsPrefix}.test.perfCache`]: process.env.ZBR_PERF_CACHE ?? "",
+      // Optional: a PDF whose Zotero structured text is written to test/out/dump-sdt.json.
+      [`${pkg.config.prefsPrefix}.test.dumpPdf`]: process.env.ZBR_DUMP_PDF ?? "",
     },
   },
 });

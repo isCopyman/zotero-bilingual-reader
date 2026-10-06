@@ -19,3 +19,18 @@ export function hash53(str: string, seed = 0): string {
 export function textHash(text: string): string {
   return hash53(text.replace(/\s+/g, " ").trim());
 }
+
+/**
+ * Key under which the same sentence from the two sources (Zotero text, MinerU) is recognised:
+ * letters and digits only, so quotes (' ’), list bullets, hyphens Zotero drops at line ends and
+ * spacing do not matter; a leading "Table 1" / "Fig. 2" label is ignored. Sentences with inline
+ * LaTeX get none: their formulas differ in kind between the sources, and so do translations.
+ */
+export function looseKey(text: string): string | null {
+  if (text.includes("$")) return null;
+  const k = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .replace(/^(table|fig|figure)\d+/, "");
+  return k.length >= 6 ? k : null;
+}

@@ -1,0 +1,19 @@
+node_modules/
+.scaffold/
+build/
+logs/
+*.log
+.env
+*.tsbuildinfo
+dev/out/
+test/out/
+.dev-zotero/
+tools/zbr.mjs
+addon/content/reader/vendor/
+
+# Not published: copyrighted paper text used by some tests, and private working notes
+test/fixtures/
+dev/fixtures/
+docs/PLAN.md
+docs/research.md
+docs/review-*.txt

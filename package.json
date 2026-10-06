@@ -1,0 +1,44 @@
+{
+  "name": "zotero-bilingual-reader",
+  "type": "module",
+  "version": "0.1.14",
+  "description": "Sentence-aligned bilingual reading for Zotero 10, with API and local agent translation.",
+  "config": {
+    "addonName": "Bilingual Reader",
+    "addonID": "bilingual-reader@zbr.local",
+    "addonRef": "zbr",
+    "addonInstance": "ZBR",
+    "prefsPrefix": "extensions.zotero.zbr"
+  },
+  "author": "highbro",
+  "homepage": "https://github.com/isCopyman/zotero-bilingual-reader",
+  "license": "MIT",
+  "scripts": {
+    "start": "node tools/copy-vendor.mjs && node tools/scaffold.mjs serve",
+    "build": "node tools/copy-vendor.mjs && node tools/scaffold.mjs build && tsc --noEmit && tsc --noEmit -p reader",
+    "test": "vitest run",
+    "test:zotero": "node tools/scaffold.mjs test",
+    "dev:reader": "node dev/serve.mjs",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p reader",
+    "vendor": "node tools/copy-vendor.mjs",
+    "build:cli": "esbuild tools/zbr.ts --bundle --platform=node --format=esm --outfile=tools/zbr.mjs"
+  },
+  "dependencies": {
+    "katex": "^0.16.22"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "chai": "^4.5.0",
+    "esbuild": "^0.25.0",
+    "mocha": "^12.0.3",
+    "pdfjs-dist": "^5.7.284",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "zotero-plugin-scaffold": "^0.8.2",
+    "zotero-types": "^4.1.0-beta.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/isCopyman/zotero-bilingual-reader.git"
+  }
+}

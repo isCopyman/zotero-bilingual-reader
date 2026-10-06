@@ -1,0 +1,178 @@
+:root {
+  --fs: 17px;
+  --bg: #fbfaf7; --fg: #1f2328; --muted: #6b7280; --line: #e5e1d8;
+  --zh-bg: #f2f7f6; --zh-bar: #2f9e8f; --hl: rgba(255, 196, 0, 0.32); --accent: #2563eb; --pair: #2563eb;
+  --en-font: "Charter", "Georgia", "Times New Roman", serif;
+  --zh-font: "Source Han Serif SC", "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --ui-font: system-ui, "Segoe UI", "Microsoft YaHei", sans-serif;
+  /* Selection and the peek card follow the page theme instead of the system's strong blue / a black card. */
+  --sel: rgba(37, 99, 235, .18);
+  --peek-bg: #ffffff; --peek-fg: #1f2328; --peek-line: #e5e1d8; --peek-title: #b45309;
+  --peek-btn: #f5f3ee; --peek-btn-line: #e0dcd2;
+}
+/* Themes: the reader sets data-theme (auto resolves to Zotero's light/dark appearance). */
+:root[data-theme="sepia"] {
+  --bg: #f4ecd8; --fg: #3b3125; --muted: #7a6a55; --line: #e0d4b8; --zh-bg: #ece2c8; --zh-bar: #a0784a;
+  --hl: rgba(214, 150, 40, 0.28); --accent: #8a5a2b; --pair: #8a5a2b; --sel: rgba(138, 90, 43, .2);
+  --peek-bg: #fbf5e6; --peek-fg: #3b3125; --peek-line: #e0d4b8; --peek-title: #8a5a2b; --peek-btn: #f1e7cf; --peek-btn-line: #ddcfb0;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1d1f21; --fg: #e5e5e5; --muted: #9ca3af; --line: #33363a; --zh-bg: #23302e; --hl: rgba(255, 196, 0, 0.25); --pair: #60a5fa;
+  --sel: rgba(96, 165, 250, .28);
+  --peek-bg: #111827; --peek-fg: #f9fafb; --peek-line: #374151; --peek-title: #fbbf24; --peek-btn: #1f2937; --peek-btn-line: #374151;
+}
+:root[data-theme="dark"] figure.fig img { filter: invert(0.88) hue-rotate(180deg); }
+* { box-sizing: border-box; }
+::selection { background: var(--sel); color: inherit; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); }
+body { font-family: var(--ui-font); }
+#toolbar {
+  position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  padding: 8px 16px; background: var(--bg); box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  border-bottom: 1px solid var(--line); font-size: 13px;
+}
+#toolbar .title { font-weight: 600; flex: 0 1 32ch; min-width: 6ch; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-right: 8px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; background: transparent; color: var(--fg); padding: 4px 9px; cursor: pointer; font: inherit; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--accent); color: #fff; }
+.opt { display: inline-flex; gap: 4px; align-items: center; color: var(--muted); }
+#toolbar select, #toolbar .primary { font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+#toolbar .primary { background: var(--accent); color: #fff; border-color: var(--accent); cursor: pointer; }
+#toolbar .primary:disabled { opacity: 0.5; cursor: default; }
+#progress { color: var(--muted); }
+
+#doc { max-width: 860px; margin: 0 auto; padding: 24px 32px 120px; font-size: var(--fs); line-height: 1.75; }
+#doc.mode-side { max-width: 1400px; }
+.page-marker { margin: 28px 0 8px; font: 12px var(--ui-font); color: var(--muted); border-top: 1px dashed var(--line); padding-top: 4px; }
+/* No content-visibility: skipped sections were laid out and painted only after they scrolled
+   into view, so a first scroll through the side-by-side view showed blank text and stuttered. A
+   paper is a few thousand elements; laying it all out once costs tens of milliseconds. */
+section.blk { margin: 0 0 0.9em; }
+.en { font-family: var(--en-font); margin: 0; }
+.zh { font-family: var(--zh-font); margin: 0; }
+h2.en, h3.en, h4.en, h5.en, h6.en, h2.zh, h3.zh, h4.zh, h5.zh, h6.zh { line-height: 1.4; margin: 0.6em 0 0.2em; }
+.mode-interleave .zh { margin-top: 0.35em; padding: 0.35em 0.8em; background: var(--zh-bg); border-left: 3px solid var(--zh-bar); border-radius: 4px; }
+.mode-interleave h2.zh, .mode-interleave h3.zh, .mode-interleave h4.zh { font-size: 0.95em; }
+.side { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+.mode-side .zh { padding-left: 14px; border-left: 2px solid var(--line); }
+.s { border-radius: 3px; transition: background-color 0.12s; }
+.s.marked { background: color-mix(in srgb, var(--mark) 38%, transparent); border-radius: 2px; }
+/* Pair mark: a frame by default, since fills belong to Zotero annotations (a framed sentence keeps
+   its annotation colour visible). Clone gives each wrapped line its own frame. */
+.s.hl { box-shadow: 0 0 0 1.5px var(--pair); -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+:root[data-pair="underline"] .s.hl { box-shadow: none; text-decoration: underline 2px var(--pair); text-underline-offset: 3px; }
+:root[data-pair="fill"] .s.hl { box-shadow: none; background: color-mix(in srgb, var(--pair) 22%, transparent); }
+#opt-pair-color { width: 26px; height: 22px; padding: 0 1px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); cursor: pointer; }
+.s.pending { color: var(--muted); }
+.zh .s.pending { font-family: var(--en-font); font-size: 0.92em; }
+.zh .s.pending::before { content: "⋯ "; }
+/* With the English right beside it, an untranslated sentence is just a marker (one per run). */
+#doc:is(.mode-interleave, .mode-side) .zh .s.pending { font-size: 0; }
+#doc:is(.mode-interleave, .mode-side) .zh .s.pending::before { content: "〔待译〕"; font-size: 0.85rem; font-family: var(--zh-font, inherit); }
+#doc:is(.mode-interleave, .mode-side) .zh .s.pending + .s.pending::before { content: none; }
+.r-reference .en { font-size: 0.85em; color: var(--muted); }
+.r-footnote { margin: 0 0 0.3em; }
+.r-footnote .en { font-size: 0.78em; line-height: 1.5; color: var(--muted); }
+.k-caption .en, .k-caption .zh { font-size: 0.9em; }
+figure.fig { margin: 0.6em auto; text-align: center; min-height: 40px; }
+figure.fig img { max-width: 100%; cursor: zoom-in; background: #fff; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+figure.fig.math img { box-shadow: none; max-height: 9em; }
+figure.fig.loading::after { content: "渲染中…"; color: var(--muted); font-size: 12px; }
+figure.fig.missing { color: var(--muted); font-size: 0.85em; font-family: var(--en-font); }
+.peek { position: fixed; z-index: 50; background: var(--peek-bg); color: var(--peek-fg); border: 1px solid var(--peek-line); border-radius: 8px; padding: 8px 12px 10px; box-shadow: 0 8px 24px rgba(0,0,0,.16); font-size: calc(var(--fs, 17px) * 0.85); line-height: 1.55; }
+.peek .peek-title { font: 12px var(--ui-font); color: var(--peek-title); margin-bottom: 4px; }
+.peek p { margin: 0 0 6px; font-family: var(--en-font); }
+.peek-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.peek-actions button { font: 12px var(--ui-font); border: 1px solid var(--peek-btn-line); background: var(--peek-btn); color: var(--peek-fg); border-radius: 5px; padding: 3px 8px; cursor: pointer; }
+.peek-actions button.swatch { width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 2px solid var(--peek-bg); box-shadow: 0 0 0 1px var(--peek-line); }
+.lightbox { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.82); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.lightbox img { max-width: 92vw; max-height: 88vh; background: #fff; cursor: grab; transform-origin: center; user-select: none; }
+.lb-hint { position: absolute; bottom: 14px; color: #d1d5db; font: 12px var(--ui-font); }
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #111827; color: #fff; padding: 8px 14px; border-radius: 6px; z-index: 200; font-size: 13px; }
+.fatal { padding: 24px; color: #b91c1c; white-space: pre-wrap; }
+.loading-doc { color: var(--muted); padding: 40px; text-align: center; }
+
+/* Peek styles in single-language modes */
+.peek-inline { margin: 6px 0 2px; padding: 8px 12px; border-left: 3px solid #f59e0b; background: rgba(245, 158, 11, .08); border-radius: 0 6px 6px 0; font-size: .92em; line-height: 1.6; }
+.peek-inline .peek-title { font: 12px var(--ui-font); color: #b45309; margin-bottom: 2px; }
+.peek-inline p { margin: 0 0 4px; }
+.s.swapped { background: rgba(46, 168, 229, .12); border-bottom: 1px dashed #2ea8e5; cursor: pointer; }
+#opt-peek.dim { opacity: .45; }
+:root[data-theme="dark"] .peek-inline { background: rgba(245, 158, 11, .12); }
+:root[data-theme="dark"] .peek-inline .peek-title { color: #fbbf24; }
+
+/* MinerU-rebuilt math and tables */
+section.blk.covered { display: none; }
+figure.fig.tex, figure.fig.html-table { position: relative; }
+.tex-body { overflow-x: auto; overflow-y: hidden; padding: 4px 0; cursor: copy; }
+.tex-body .katex-display { margin: .4em 0; }
+.table-body { overflow-x: auto; }
+.table-body table { border-collapse: collapse; margin: 0 auto; font: 13px/1.45 var(--en-font); }
+.table-body td, .table-body th { border: 1px solid var(--rule, #d1d5db); padding: 3px 8px; text-align: center; }
+.table-body tr:first-child td { font-weight: 600; background: rgba(127, 127, 127, .08); }
+.fig-tools { position: absolute; top: 2px; right: 2px; display: none; gap: 4px; }
+figure.fig:hover .fig-tools { display: flex; }
+.fig-tools button { font: 11px var(--ui-font); border: 1px solid #d1d5db; background: rgba(255, 255, 255, .92); border-radius: 4px; padding: 1px 6px; cursor: pointer; }
+:root[data-theme="dark"] .fig-tools button { background: rgba(31, 41, 55, .92); border-color: #4b5563; color: #f9fafb; }
+figure.fig.sized { width: min(100%, var(--fw)); aspect-ratio: var(--ar); }
+.peek-editor { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.peek-editor textarea { font: 13px/1.5 var(--ui-font); width: 100%; min-width: 320px; box-sizing: border-box; background: var(--bg); color: var(--peek-fg); border: 1px solid var(--peek-btn-line); border-radius: 5px; padding: 6px 8px; resize: vertical; }
+.peek-editor button { align-self: flex-end; font: 12px var(--ui-font); border: 1px solid #2563eb; background: #2563eb; color: #fff; border-radius: 5px; padding: 3px 12px; cursor: pointer; }
+.peek-actions button.swatch.on { border-color: var(--peek-fg); }
+.s.marked { cursor: pointer; }
+#toolbar button.link { font: inherit; border: 0; background: none; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 0 2px; }
+#toolbar button.link:hover { color: var(--fg); }
+#toolbar button.link { font: inherit; border: 0; background: none; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 0 2px; }
+#toolbar button.link:hover { color: var(--fg); }
+#toolbar > button:not(.primary):not(.link) { font: inherit; padding: 4px 9px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; }
+
+/* "交给 Agent…" panel and the glossary dialog */
+.ho-back { position: fixed; inset: 0; z-index: 120; background: rgba(0, 0, 0, .28); display: flex; align-items: flex-start; justify-content: center; padding-top: 8vh; }
+.ho-panel { width: min(720px, 92vw); max-height: 84vh; overflow: auto; background: var(--peek-bg); color: var(--peek-fg); border: 1px solid var(--peek-line); border-radius: 10px; box-shadow: 0 12px 36px rgba(0, 0, 0, .25); font: 14px/1.6 var(--ui-font); }
+.ho-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--peek-line); }
+.ho-x { border: 0; background: none; color: var(--muted); font-size: 20px; cursor: pointer; }
+.ho-body { padding: 12px 16px 16px; }
+.ho-intro { margin: 0 0 10px; color: var(--muted); }
+.ho-copy { margin: 8px 0; }
+.ho-copy-head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+.ho-copy code { display: block; margin-top: 3px; padding: 8px 10px; background: var(--peek-btn); border: 1px solid var(--peek-btn-line); border-radius: 6px; white-space: pre-wrap; word-break: break-all; font: 13px/1.5 Consolas, "Cascadia Mono", var(--ui-font); user-select: all; }
+.ho-cmds { margin: 8px 0; }
+.ho-cmds summary { cursor: pointer; color: var(--muted); }
+.ho-status { margin: 12px 0 8px; padding: 8px 10px; border-left: 3px solid var(--accent); background: var(--peek-btn); border-radius: 0 6px 6px 0; }
+.ho-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.ho-body button, .ho-copy-head button { font: 12px var(--ui-font); border: 1px solid var(--peek-btn-line); background: var(--peek-btn); color: var(--peek-fg); border-radius: 5px; padding: 3px 10px; cursor: pointer; }
+.ho-glossary { width: 100%; min-height: 320px; box-sizing: border-box; font: 13px/1.6 Consolas, "Cascadia Mono", var(--ui-font); background: var(--bg); color: var(--fg); border: 1px solid var(--peek-btn-line); border-radius: 6px; padding: 8px; }
+
+/* Paragraph action: one button that follows the hovered paragraph, in the page's right margin. */
+#blk-action {
+  position: absolute; z-index: 5; width: 24px; height: 24px; padding: 3px; display: grid; place-items: center;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--muted); cursor: pointer;
+  opacity: .75; user-select: none;
+}
+#blk-action:hover { opacity: 1; color: var(--accent); border-color: var(--accent); }
+#blk-action[hidden] { display: none; }
+#blk-action.k-retry { color: #dc2626; border-color: #fca5a5; opacity: 1; }
+#blk-action.k-busy { cursor: default; }
+#blk-action.k-busy svg { animation: blk-spin 0.9s linear infinite; }
+@keyframes blk-spin { to { transform: rotate(360deg); } }
+
+/* Find in page (Ctrl+F). */
+#find-bar {
+  position: fixed; top: 92px; right: 18px; z-index: 20; display: flex; gap: 4px; align-items: center;
+  padding: 6px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.12); font: 13px var(--ui-font); color: var(--fg);
+}
+#find-bar[hidden] { display: none; }
+#find-input { width: 220px; font: inherit; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+#find-count { min-width: 4.5em; color: var(--muted); text-align: center; }
+#find-bar button { border: 1px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 5px; padding: 2px 8px; cursor: pointer; font: inherit; }
+.s.found { background: color-mix(in srgb, #f59e0b 16%, transparent); }
+.s.found-cur { background: color-mix(in srgb, #f59e0b 30%, transparent); box-shadow: 0 0 0 1.5px #f59e0b; }
+::highlight(zbr-find) { background: #f59e0b; color: #000; }
+
+/* "MinerU 解析…" dialog */
+.mn-steps { margin: 4px 0 10px; padding-left: 1.4em; }
+.mn-steps a { color: var(--accent); }
+.mn-token { width: 100%; box-sizing: border-box; font: 13px Consolas, "Cascadia Mono", var(--ui-font); padding: 6px 8px; background: var(--bg); color: var(--fg); border: 1px solid var(--peek-btn-line); border-radius: 6px; }

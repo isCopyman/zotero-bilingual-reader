@@ -1,0 +1,52 @@
+<linkset>
+  <html:link rel="localization" href="__addonRef__-mainWindow.ftl" />
+</linkset>
+<vbox id="zbr-prefs" class="main-section" onload="Zotero.__addonInstance__?.hooks.onPrefsLoad(window)">
+  <groupbox>
+    <label><html:h2>翻译</html:h2></label>
+    <description class="zbr-hint">阅读时按段落分批翻译，看到哪里译到哪里；每篇论文第一次翻译前，先用一次短请求定下这篇的术语表，之后各段统一使用。想让 Agent 通读全文、统一术语后整篇译完，在双语页点“交给 Agent…”，把任务交给你自己打开的 Agent 会话，过程在那边看得到。</description>
+    <html:table class="zbr-grid">
+      <html:tr>
+        <html:td>同时请求数</html:td>
+        <html:td><html:input type="number" min="1" max="12" preference="__prefsPrefix__.agentConcurrency" /> 分批翻译时同时发出的请求数</html:td>
+      </html:tr>
+    </html:table>
+  </groupbox>
+
+  <groupbox>
+    <label><html:h2>本机 Agent</html:h2></label>
+    <description class="zbr-hint">翻译时用哪一个，在双语页工具栏右侧选择。“跟随工具自己的设置”表示不传参数，由该工具的配置文件决定（括号里是它当前的设置）。</description>
+    <html:div id="zbr-agents" />
+    <hbox align="center">
+      <button id="zbr-detect" label="重新检测" />
+      <label id="zbr-detect-result" />
+    </hbox>
+  </groupbox>
+
+  <groupbox>
+    <label><html:h2>翻译引擎：OpenAI 兼容 API</html:h2></label>
+    <description>分批翻译最快的方式。每个服务商可以勾选多个模型，每个模型在阅读页的“引擎”下拉里单独出现。API Key 保存在 Zotero 配置文件的偏好设置中（明文）。</description>
+    <html:div id="zbr-apis" />
+    <hbox align="center">
+      <button id="zbr-api-add" label="添加服务商" />
+      <button id="zbr-api-add-cpa" label="添加本机 CLIProxyAPI" tooltiptext="http://127.0.0.1:8317/v1，默认模型 k3-256k、同时请求 16、思考强度低；Key 需要自己填" />
+    </hbox>
+  </groupbox>
+
+  <groupbox>
+    <label><html:h2>翻译与数据</html:h2></label>
+    <label>术语表（每行一条：English = 中文）</label>
+    <html:textarea rows="5" preference="__prefsPrefix__.glossary" placeholder="numerical weather prediction = 数值天气预报" />
+    <hbox align="center">
+      <label>MinerU 解析库目录（留空为 Zotero 数据目录下的 mineru-paper-store）</label>
+    </hbox>
+    <html:input type="text" preference="__prefsPrefix__.mineruRoot" />
+    <hbox align="center">
+      <label>MinerU API Token（可选：在 mineru.net 的“API 管理”免费创建；填了之后双语页工具栏的“MinerU 解析…”可直接云端解析，公式按 LaTeX 排版）</label>
+    </hbox>
+    <html:input type="password" preference="__prefsPrefix__.mineruToken" />
+    <hbox align="center">
+      <button id="zbr-open-cache" label="打开译文缓存目录" />
+    </hbox>
+  </groupbox>
+</vbox>

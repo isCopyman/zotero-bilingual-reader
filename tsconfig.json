@@ -1,0 +1,11 @@
+{
+  "extends": "zotero-types/entries/sandbox/",
+  "compilerOptions": {
+    "resolveJsonModule": true,
+    "strict": true,
+    "noImplicitAny": false,
+    "skipLibCheck": true
+  },
+  "include": ["src", "core", "typings/global.d.ts", "typings/reader.d.ts"],
+  "exclude": ["build", "addon", "reader", "test", "tools", "dev"]
+}

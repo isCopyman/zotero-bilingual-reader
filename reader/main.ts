@@ -1,3 +1,4 @@
+import { clearPairFrame } from "./pair-frame";
 import { DEFAULT_PREFS, type DocSource, type Theme, type Granularity, type HighlightView, type Mode, type PairStyle, type PeekStyle, type ReaderPrefs, type RichStyle, type TranslationProgress, type ZbrHost } from "../core/host-api";
 import type { Enrichment } from "../core/mineru";
 import type { Block, ZbrDocument } from "../core/model";
@@ -84,9 +85,11 @@ function firstVisibleBlock(): string | null {
 
 let finder: ReturnType<typeof installSearch> | undefined;
 let outline: ReturnType<typeof installOutline> | undefined;
+window.addEventListener("resize", () => clearPairFrame());
 
 function renderAll() {
   const t0 = performance.now();
+  clearPairFrame();
   const anchor = firstVisibleBlock();
   const main = $("#doc");
   main.className = `mode-${state.prefs.mode}`;
@@ -582,6 +585,8 @@ async function main() {
     setOpen: (open: boolean, tab?: OutlineTab) => {
       void setPrefs(tab ? { outline: open, outlineTab: tab } : { outline: open }, false);
       outline?.syncOpen();
+      // The text moved over; the frame would stay behind.
+      clearPairFrame();
     },
     toast,
   });

@@ -478,7 +478,24 @@ describe("Bilingual Reader in Zotero", function () {
     span.dispatchEvent(new rwin.MouseEvent("mouseover", { bubbles: true }));
     const zh = await waitFor(() => rdoc.querySelector<HTMLElement>(`.zh .s.hl[data-u="${span.dataset.u}"]`), 3000);
     const css = () => rwin.getComputedStyle(zh);
-    assert.match(css().boxShadow, /rgb\(37, 99, 235\)/, "blue frame by default");
+    // One outline per language around the marked text, not a box per sentence or line.
+    const frames = () => [...rdoc.querySelectorAll<SVGPathElement>("#pair-frame path")];
+    assert.equal(frames().length, 2, "one frame for English, one for Chinese");
+    assert.equal(rwin.getComputedStyle(frames()[0]).stroke, "rgb(37, 99, 235)", "blue frame by default");
+    assert.equal(css().boxShadow, "none");
+    // Three sentences: still one frame per language.
+    (rdoc.querySelector('[data-gran="3"]') as HTMLElement).click();
+    span.dispatchEvent(new rwin.MouseEvent("mouseout", { bubbles: true, relatedTarget: rdoc.body }));
+    const para = [...rdoc.querySelectorAll<HTMLElement>("section.k-paragraph.done")].find((p) => p.querySelectorAll(".en .s[data-u]").length >= 6)!;
+    para.scrollIntoView({ block: "center" });
+    const other = para.querySelector<HTMLElement>(".en .s[data-u]")!;
+    other.dispatchEvent(new rwin.MouseEvent("mouseover", { bubbles: true }));
+    await waitFor(() => rdoc.querySelectorAll(".en .s.hl").length >= 2, 3000, 20);
+    assert.equal(frames().length, 2, "group of sentences: one frame per language");
+    await snap("03c-pair-frame");
+    (rdoc.querySelector('[data-gran="1"]') as HTMLElement).click();
+    span.dispatchEvent(new rwin.MouseEvent("mouseover", { bubbles: true }));
+    await waitFor(() => rdoc.querySelector(`.zh .s.hl[data-u="${span.dataset.u}"]`), 3000);
     const style = rdoc.getElementById("opt-pair") as HTMLSelectElement;
     const color = rdoc.getElementById("opt-pair-color") as HTMLInputElement;
     style.value = "underline";
@@ -487,7 +504,7 @@ describe("Bilingual Reader in Zotero", function () {
     color.dispatchEvent(new rwin.Event("input", { bubbles: true }));
     await waitFor(() => css().textDecorationLine === "underline", 3000, 20);
     assert.equal(css().textDecorationColor, "rgb(220, 38, 38)");
-    assert.equal(css().boxShadow, "none");
+    assert.isTrue(frames().every((f) => rwin.getComputedStyle(f.ownerSVGElement!).display === "none"), "no frame with underline");
     await snap("03d-pair-underline");
     style.value = "fill";
     style.dispatchEvent(new rwin.Event("change", { bubbles: true }));
@@ -496,7 +513,8 @@ describe("Bilingual Reader in Zotero", function () {
     (rdoc.getElementById("opt-pair-reset") as HTMLElement).click();
     style.value = "frame";
     style.dispatchEvent(new rwin.Event("change", { bubbles: true }));
-    await waitFor(() => /rgb\(37, 99, 235\)/.test(css().boxShadow), 3000, 20);
+    span.dispatchEvent(new rwin.MouseEvent("mouseover", { bubbles: true, relatedTarget: rdoc.body }));
+    await waitFor(() => frames().length === 2 && rwin.getComputedStyle(frames()[0]).stroke === "rgb(37, 99, 235)", 3000, 20);
     span.dispatchEvent(new rwin.MouseEvent("mouseout", { bubbles: true, relatedTarget: rdoc.body }));
   });
 

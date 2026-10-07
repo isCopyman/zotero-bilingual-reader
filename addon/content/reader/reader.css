@@ -60,8 +60,11 @@ h2.en, h3.en, h4.en, h5.en, h6.en, h2.zh, h3.zh, h4.zh, h5.zh, h6.zh { line-heig
 .s { border-radius: 3px; transition: background-color 0.12s; }
 .s.marked { background: color-mix(in srgb, var(--mark) 38%, transparent); border-radius: 2px; }
 /* Pair mark: a frame by default, since fills belong to Zotero annotations (a framed sentence keeps
-   its annotation colour visible). Clone gives each wrapped line its own frame. */
-.s.hl { box-shadow: 0 0 0 1.5px var(--pair); -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+   its annotation colour visible). The frame is one outline around the marked text of a paragraph,
+   drawn by pair-frame.ts on this layer. */
+#pair-frame { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; z-index: 3; }
+#pair-frame path { fill: none; stroke: var(--pair); stroke-width: 1.5; stroke-linejoin: round; }
+:root:not([data-pair="frame"]) #pair-frame { display: none; }
 :root[data-pair="underline"] .s.hl { box-shadow: none; text-decoration: underline 2px var(--pair); text-underline-offset: 3px; }
 :root[data-pair="fill"] .s.hl { box-shadow: none; background: color-mix(in srgb, var(--pair) 22%, transparent); }
 #opt-pair-color { width: 26px; height: 22px; padding: 0 1px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); cursor: pointer; }

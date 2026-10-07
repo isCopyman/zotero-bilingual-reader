@@ -1,5 +1,6 @@
 // Hover sync, peek popover and selection-to-sentence mapping.
 
+import { clearPairFrame, drawPairFrame } from "./pair-frame";
 import { blockIdOf, groupUnits } from "../core/groups";
 import type { Granularity, HighlightView, Mode, PeekStyle, ZbrHost } from "../core/host-api";
 import type { Block } from "../core/model";
@@ -313,7 +314,11 @@ export function installInteractions(ctx: InteractCtx) {
   const setHover = (ids: string[]) => {
     for (const e of unitElements(root, hovered)) e.classList.remove("hl");
     hovered = ids;
-    for (const e of unitElements(root, hovered)) e.classList.add("hl");
+    const els = unitElements(root, hovered);
+    for (const e of els) e.classList.add("hl");
+    // Frame style: one outline per paragraph and language, drawn over the text.
+    if ((document.documentElement.dataset.pair ?? "frame") === "frame") drawPairFrame(els);
+    else clearPairFrame();
   };
   const singleLang = () => ctx.getMode() === "en" || ctx.getMode() === "zh";
   const clearPeek = () => {

@@ -239,3 +239,6 @@ section.blk { position: relative; }
 section.blk.bookmarked::before { content: ""; position: absolute; left: -18px; top: 4px; width: 8px; height: 14px; background: var(--accent); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%); }
 .ol-flash { animation: ol-flash 1.2s ease-out; }
 @keyframes ol-flash { from { background: color-mix(in srgb, var(--accent) 22%, transparent); } to { background: transparent; } }
+
+/* Laid over Zotero's reader, whose toolbar is a window-drag area: clicks here are clicks. */
+html { -moz-window-dragging: no-drag; }

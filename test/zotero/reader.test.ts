@@ -695,11 +695,17 @@ describe("Bilingual Reader in Zotero", function () {
       const odoc = await waitFor(() => (owin.document.body?.classList.contains("ready") ? owin.document : null), 120_000);
       const back = odoc.getElementById("btn-back-pdf") as HTMLElement;
       assert.isFalse(back.hidden, "back-to-PDF button shown");
+      // The reader underneath is hidden: its toolbar is a window-drag area that would otherwise
+      // swallow real mouse clicks on the page's toolbar.
+      const readerBrowser = container.querySelector("browser.reader") as HTMLElement;
+      assert.equal(readerBrowser.style.visibility, "hidden");
+      assert.equal(win.getComputedStyle(iframe).getPropertyValue("-moz-window-dragging"), "no-drag");
       await snap("19-overlay");
       // Back to the PDF: the view stays loaded, only hidden.
       back.click();
       assert.isFalse(iframe.hasAttribute("zbr-shown"));
       assert.equal(iframe.style.visibility, "hidden");
+      assert.equal(readerBrowser.style.visibility, "");
       await snap("19b-overlay-pdf");
       // The bilingual icon in the reader's toolbar brings it back, the same page.
       const reader = Z.Reader.getByTabID(tabID);

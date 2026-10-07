@@ -100,7 +100,11 @@ function setOverlayShown(tabID: string, shown: boolean) {
   // Hidden with visibility, not display: the page keeps its layout and scroll position.
   o.iframe.style.visibility = shown ? "visible" : "hidden";
   o.iframe.toggleAttribute("zbr-shown", shown);
+  // The reader's toolbar is a window-drag area (-moz-window-dragging): even covered, it would
+  // turn clicks on the page's toolbar into dragging the window. Hidden, it takes no part.
   const win = Zotero.getMainWindow() as any;
+  const reader = win.document.getElementById(tabID)?.querySelector("browser.reader") as HTMLElement | null;
+  if (reader) reader.style.visibility = shown ? "hidden" : "";
   // The reader underneath keeps its place; keys go to whichever view is on top.
   if (shown) o.iframe.focus();
   else (Zotero as any).Reader.getByTabID?.(tabID)?.focus?.();
@@ -110,6 +114,7 @@ function setOverlayShown(tabID: string, shown: boolean) {
 function disposeOverlay(tabID: string) {
   const o = overlays.get(tabID);
   if (!o) return;
+  setOverlayShown(tabID, false);
   overlays.delete(tabID);
   o.host.dispose();
   o.iframe.remove();
@@ -176,6 +181,7 @@ export async function showOverlay(attachment: any) {
   const iframe = makeReaderFrame(win.document, host);
   // Over the whole reader (its toolbar and sidebars too); the item pane on the right stays.
   iframe.style.cssText = "border:0;position:absolute;inset:0;width:100%;height:100%;z-index:5;background:var(--material-background, #fff);";
+  iframe.style.setProperty("-moz-window-dragging", "no-drag");
   if (!container.style.position) container.style.position = "relative";
   container.append(iframe);
   overlays.set(tabID, { iframe, host, itemID: attachment.id });

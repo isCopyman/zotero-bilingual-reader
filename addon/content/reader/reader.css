@@ -245,3 +245,14 @@ section.blk.bookmarked::before { content: ""; position: absolute; left: -18px; t
 
 /* Laid over Zotero's reader, whose toolbar is a window-drag area: clicks here are clicks. */
 html { -moz-window-dragging: no-drag; }
+
+/* Right-click menu over sentences, styled like the bubble. */
+.ctx-menu { position: fixed; z-index: 60; min-width: 200px; padding: 4px; background: var(--peek-bg); color: var(--peek-fg); border: 1px solid var(--peek-line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.18); font: 13px/1.4 var(--ui-font); user-select: none; }
+.ctx-item { display: flex; width: 100%; justify-content: space-between; gap: 24px; padding: 5px 10px; border: 0; border-radius: 5px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.ctx-item:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.ctx-hint { color: var(--muted); font-size: 12px; }
+.ctx-sep { height: 1px; margin: 4px 6px; background: var(--peek-line); }
+.ctx-swatches { display: flex; align-items: center; gap: 6px; padding: 5px 10px; }
+.ctx-swatches span { flex: 1; }
+.ctx-swatches .swatch { width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 2px solid var(--peek-bg); box-shadow: 0 0 0 1px var(--peek-line); cursor: pointer; }
+.ctx-swatches .swatch.on { border-color: var(--peek-fg); }

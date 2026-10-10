@@ -396,9 +396,9 @@ export function installOutline(ctx: OutlineCtx) {
     renderMarks();
   }
 
-  /** Bookmark the paragraph at the top of the view, or remove its bookmark. */
-  function toggleHere() {
-    const block = blockHere();
+  /** Bookmark the paragraph at the top of the view (or the given one), or remove its bookmark. */
+  function toggleHere(blockId?: string) {
+    const block = blockId ? ctx.getDoc().blocks.find((b) => b.id === blockId) : blockHere();
     if (!block) return;
     const existing = bookmarks.find((m) => resolve(m)?.id === block.id);
     if (existing) {
@@ -460,5 +460,7 @@ export function installOutline(ctx: OutlineCtx) {
       ctx.setOpen(!ctx.isOpen());
     },
     toggleHere,
+    /** Whether a paragraph has a bookmark. */
+    isBookmarked: (blockId: string) => bookmarks.some((m) => resolve(m)?.id === blockId),
   };
 }

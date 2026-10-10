@@ -868,6 +868,56 @@ describe("Bilingual Reader in Zotero", function () {
       await waitFor(async () => (await host.getPrefs()).highlightWithZh === false, 3000, 50);
     });
 
+    it("right-click menu: copy, highlight and delete without selecting first", async function () {
+      const other = [...rdoc.querySelectorAll<HTMLElement>("section.k-paragraph.done .en .s[data-u]")][28];
+      other.scrollIntoView({ block: "center" });
+      await sleep(300);
+      rwin.getSelection().removeAllRanges();
+      const items = () => [...rdoc.querySelectorAll<HTMLElement>(".ctx-menu .ctx-item")];
+      const pick = (label: RegExp) => items().find((b) => label.test(b.textContent!))!;
+      const rightClick = (el: HTMLElement) => {
+        const r = el.getBoundingClientRect();
+        el.dispatchEvent(new rwin.MouseEvent("mouseup", { bubbles: true, button: 2, clientX: r.left + 5, clientY: r.top + 5 }));
+        el.dispatchEvent(new rwin.MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2, clientX: r.left + 5, clientY: r.top + 5 }));
+      };
+      rightClick(other);
+      await waitFor(() => rdoc.querySelector(".ctx-menu"), 3000, 20);
+      assert.isTrue(other.classList.contains("hl"), "the sentence is marked while the menu is open");
+      assert.isNull(rdoc.querySelector(".peek"), "no selection bubble from the right button");
+      const labels = items().map((b) => b.textContent);
+      for (const l of ["复制英文", "复制中文", "复制中英对照", "高亮并批注…", "在 PDF 中定位", "修改译文…", "重新翻译这段"]) assert.include(labels, l);
+      await snap("20-context-menu");
+      pick(/^复制中英对照$/).click();
+      assert.isNull(rdoc.querySelector(".ctx-menu"), "closed after the action");
+      const clip = await waitFor(async () => {
+        const t = await rwin.navigator.clipboard.readText();
+        return t.includes(other.textContent!.trim().slice(0, 20)) && /[一-鿿]/.test(t) && t;
+      }, 3000, 50);
+      assert.match(clip, /\n/);
+      // Highlight from the menu's colour row.
+      rightClick(other);
+      (await waitFor(() => rdoc.querySelector<HTMLElement>(".ctx-menu .ctx-swatches .swatch"), 3000, 20)).click();
+      const a = await waitFor(() => attachment.getAnnotations().find((x: any) => x.annotationText && other.textContent!.includes(x.annotationText.slice(0, 20))), 5000);
+      await waitFor(() => other.classList.contains("marked"), 5000, 20);
+      // Over the highlight the menu offers its own actions; deleting asks first.
+      rightClick(other);
+      await waitFor(() => rdoc.querySelector(".ctx-menu"), 3000, 20);
+      assert.include(items().map((b) => b.textContent), "删除高亮");
+      const confirm = rwin.wrappedJSObject.confirm;
+      rwin.wrappedJSObject.confirm = () => true;
+      try {
+        pick(/^删除高亮$/).click();
+        await waitFor(() => !attachment.getAnnotations().some((x: any) => x.key === a.key), 5000, 20);
+      } finally {
+        rwin.wrappedJSObject.confirm = confirm;
+      }
+      // Outside any sentence the page shows no menu of its own.
+      const fig = rdoc.querySelector<HTMLElement>("section.k-image figure")!;
+      const ev = new rwin.MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 });
+      fig.dispatchEvent(ev);
+      assert.isNull(rdoc.querySelector(".ctx-menu"));
+    });
+
     it("drops the tint when the annotation is deleted elsewhere", async function () {
       const [a] = attachment.getAnnotations();
       await a.eraseTx();

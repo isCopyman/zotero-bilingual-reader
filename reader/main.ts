@@ -566,6 +566,8 @@ async function main() {
     getHighlightWithZh: () => state.prefs.highlightWithZh,
     // MinerU sentences are highlighted through the Zotero text they were aligned with.
     canHighlight: () => host.capabilities.highlights,
+    toggleBookmark: (blockId) => outline?.toggleHere(blockId),
+    isBookmarked: (blockId) => !!outline?.isBookmarked(blockId),
     toast,
   });
   finder = installSearch({ blocks: () => state.doc.blocks, getTranslations: () => state.tr });
